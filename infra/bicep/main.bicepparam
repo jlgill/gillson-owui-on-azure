@@ -1,0 +1,12 @@
+using 'main.bicep'
+
+param parApimName = 'apim-open-webui'
+param parLocation = 'uksouth'
+param parApimPublisherEmail = 'dan@rios.engineer'
+param parApimPublisherName = 'Dan Rios'
+param parFrontDoorName = 'afd-open-webui'
+param parResourceGroupName = 'rg-lb-core'
+param parVirtualNetworkName = 'vnet-lb-core'
+param parVirtualNetworkAddressPrefix = '10.0.0.0/24'
+param parApimSubnetAddressPrefix = '10.0.1.0/24'
+param parFrontDoorSku = 'Standard_AzureFrontDoor'
