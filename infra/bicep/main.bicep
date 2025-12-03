@@ -10,6 +10,8 @@ param parApimPublisherName string
 param parVirtualNetworkName string
 param parVirtualNetworkAddressPrefix string
 param parApimSubnetAddressPrefix string
+param parContainerAppFqdn string = ''
+param parContainerAppResourceId string = ''
 var varOpenWebUi = 'open-webui'
 var varNsgRules = loadJsonContent('nsg-rules.json')
 
@@ -59,8 +61,10 @@ module modLogAnalyticsWorkspace 'br/public:avm/res/operational-insights/workspac
     name: '${varOpenWebUi}-law'
     location: parLocation
     dailyQuotaGb:1
+    dataRetention: 30
+    skuName: 'PerGB2018'
     features:{
-      disableLocalAuth: false
+      disableLocalAuth: true
     }
   }
   dependsOn: [
@@ -73,7 +77,7 @@ module modAppInsights 'br/public:avm/res/insights/component:0.7.0' = {
   params: {
     name: '${varOpenWebUi}-appi'
     workspaceResourceId: modLogAnalyticsWorkspace.outputs.resourceId
-    disableLocalAuth: false
+    disableLocalAuth: true
     applicationType: 'web'
     location: parLocation
     kind: 'web'
@@ -111,6 +115,27 @@ module modFrontDoor 'br/public:avm/res/cdn/profile:0.16.1' = {
           }
         ]
       }
+      {
+        name: 'afd-${varOpenWebUi}-app-endpoint'
+        enabledState: 'Enabled'
+        routes: [
+          {
+            name: 'afd-${varOpenWebUi}-app-route'
+            originGroupName: '${varOpenWebUi}-app-origin-group'
+            enabledState: 'Enabled'
+            httpsRedirect: 'Enabled'
+            supportedProtocols:[
+              'Http'
+              'Https'
+            ]
+            forwardingProtocol: 'HttpsOnly'
+            originPath: '/'
+            patternsToMatch: [
+              '/*'
+            ]
+          }
+        ]
+      }
     ]
     originGroups: [
       {
@@ -124,6 +149,29 @@ module modFrontDoor 'br/public:avm/res/cdn/profile:0.16.1' = {
           {
             name: 'afd-apim-origin'
             hostName: '${parApimName}.azure-api.net'
+          }
+        ]
+      }
+      {
+        name: '${varOpenWebUi}-app-origin-group'
+        loadBalancingSettings: {
+          additionalLatencyInMilliseconds: 50
+          sampleSize: 4
+          successfulSamplesRequired: 3
+        }
+        origins: [
+          {
+            name: 'afd-${varOpenWebUi}-app-origin'
+            hostName: parContainerAppFqdn
+            enabledState: !empty(parContainerAppFqdn) ? 'Enabled' : 'Disabled'
+            sharedPrivateLinkResource: !empty(parContainerAppResourceId) ? {
+              privateLink: {
+                id: parContainerAppResourceId
+              }
+              privateLinkLocation: parLocation
+              groupId: 'managedEnvironments'
+              requestMessage: 'AFD Private Link Request'
+            } : null
           }
         ]
       }
