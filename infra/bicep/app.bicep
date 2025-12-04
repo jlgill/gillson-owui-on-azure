@@ -1,11 +1,47 @@
 targetScope = 'subscription'
 
+extension 'br:mcr.microsoft.com/bicep/extensions/microsoftgraph/v1.0:0.1.8-preview'
+
 param parLocation string = 'uksouth'
 param parResourceGroupName string
 param parVirtualNetworkAddressPrefix string
 param parAcaSubnetAddressPrefix string
-var varOpenWebUiApp = 'open-webui-app'
+param parHubResourceGroupName string
+param parHubVirtualNetworkName string
+param parCustomDomain string
 var varOpenWebUiShare = 'open-webui-share'
+var varOpenWebUiApp = 'open-webui-app'
+var varAppRegistrationName = 'app-open-webui'
+
+resource entraIdApp 'Microsoft.Graph/applications@v1.0' = {
+  displayName: varAppRegistrationName
+  uniqueName: varAppRegistrationName
+  signInAudience: 'AzureADMyOrg'
+  web: {
+    redirectUris: [
+      'https://${parCustomDomain}/.auth/login/aad/callback'
+      'https://${varOpenWebUiApp}-aca.${modContainerAppEnv.outputs.defaultDomain}/.auth/login/aad/callback'
+    ]
+    implicitGrantSettings: {
+      enableIdTokenIssuance: true
+    }
+  }
+  requiredResourceAccess: [
+    {
+      resourceAppId: '00000003-0000-0000-c000-000000000000' // Microsoft Graph
+      resourceAccess: [
+        {
+          id: 'e1fe6dd8-ba31-4d61-89e7-88639da4683d' // User.Read
+          type: 'Scope'
+        }
+      ]
+    }
+  ]
+}
+
+resource entraIdServicePrincipal 'Microsoft.Graph/servicePrincipals@v1.0' = {
+  appId: entraIdApp.appId
+}
 
 module modResourceGroup 'br/public:avm/res/resources/resource-group:0.4.2' = {
   params: {
@@ -40,6 +76,16 @@ module modVirtualNetwork 'br/public:avm/res/network/virtual-network:0.7.1' = {
         ]
       }
     ]
+    // Spoke to Hub VNet peering
+    peerings: !empty(parHubVirtualNetworkName) ? [
+      {
+        remoteVirtualNetworkResourceId: resourceId(subscription().subscriptionId, parHubResourceGroupName, 'Microsoft.Network/virtualNetworks', parHubVirtualNetworkName)
+        allowForwardedTraffic: true
+        allowGatewayTransit: false
+        allowVirtualNetworkAccess: true
+        useRemoteGateways: false
+      }
+    ] : []
   }
   dependsOn: [modResourceGroup]
 }
@@ -203,11 +249,34 @@ module modContainerApp 'br/public:avm/res/app/container-app:0.19.0' = {
       ]
     }
     authConfig: {
+      identityProviders: {
+        azureActiveDirectory: {
+          enabled: true
+          registration: {
+            clientId: entraIdApp.appId
+            openIdIssuer: '${environment().authentication.loginEndpoint}${tenant().tenantId}/v2.0'
+          }
+          validation: {
+            allowedAudiences: [
+              'api://${entraIdApp.appId}'
+            ]
+            defaultAuthorizationPolicy: {
+              allowedApplications: [
+                entraIdApp.appId
+              ]
+            }
+          }
+        }
+      }
       httpSettings: {
         requireHttps: true
+        forwardProxy: {
+          convention: 'Standard'
+        }
       }
       globalValidation: {
-        unauthenticatedClientAction: 'Return401'
+        unauthenticatedClientAction: 'RedirectToLoginPage'
+        redirectToProvider: 'azureActiveDirectory'
       }
       platform: {
         enabled: true
@@ -236,3 +305,6 @@ module modStorageRbac 'br/public:avm/ptn/authorization/resource-role-assignment:
 
 output outContainerAppFqdn string = modContainerApp.outputs.fqdn
 output outContainerAppResourceId string = modContainerApp.outputs.resourceId
+output outContainerAppEnvDefaultDomain string = modContainerAppEnv.outputs.defaultDomain
+output outVirtualNetworkName string = modVirtualNetwork.outputs.name
+output outVirtualNetworkResourceId string = modVirtualNetwork.outputs.resourceId

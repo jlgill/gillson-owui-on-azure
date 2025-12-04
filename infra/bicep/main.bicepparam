@@ -9,7 +9,9 @@ param parResourceGroupName = 'rg-lb-core'
 param parVirtualNetworkName = 'vnet-lb-core'
 param parVirtualNetworkAddressPrefix = '10.0.0.0/24'
 param parApimSubnetAddressPrefix = '10.0.0.0/28'
-param parAppGatewaySubnetAddressPrefix = '10.0.0.64/26'  // App Gateway requires at least /26
-
-// Container App FQDN (populate after deploying app.bicep)
-param parContainerAppFqdn = '' 
+param parAppGatewaySubnetAddressPrefix = '10.0.0.64/26'
+param parContainerAppFqdn = 'open-webui-app-aca.jollyfield-adf491b7.uksouth.azurecontainerapps.io'
+param parContainerAppStaticIp = '10.0.4.91'
+param parSpokeResourceGroupName = 'rg-open-webui-app'
+param parSpokeVirtualNetworkName = 'open-webui-app-vnet'
+param parCustomDomain = 'openwebui.rios.engineer' 

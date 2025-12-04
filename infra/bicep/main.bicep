@@ -13,10 +13,17 @@ param parAppGatewaySubnetAddressPrefix string
 @validate(
   x => !contains(x, 'https://'), 'The Container App param FQDN must not contain the "https://" prefix.'
 )
-param parContainerAppFqdn string = ''
+param parContainerAppFqdn string
+param parContainerAppStaticIp string
+param parSpokeResourceGroupName string
+param parSpokeVirtualNetworkName string
+@description('Custom domain for the Container App listener (e.g., openwebui.example.com).')
+param parCustomDomain string = ''
 
 var varOpenWebUi = 'open-webui'
 var varNsgRules = loadJsonContent('nsg-rules.json')
+var varContainerAppEnvDefaultDomain = !empty(parContainerAppFqdn) ? join(skip(split(parContainerAppFqdn, '.'), 1), '.') : ''
+var varContainerAppName = !empty(parContainerAppFqdn) ? split(parContainerAppFqdn, '.')[0] : ''
 
 module modResourceGroup 'br/public:avm/res/resources/resource-group:0.4.2' = {
   params: {
@@ -41,6 +48,42 @@ module modVirtualNetwork 'br/public:avm/res/network/virtual-network:0.7.1' = {
       {
         name: 'appgw-subnet'
         addressPrefix: parAppGatewaySubnetAddressPrefix
+      }
+    ]
+    // Hub to Spoke VNet peering
+    peerings: !empty(parSpokeVirtualNetworkName) ? [
+      {
+        remoteVirtualNetworkResourceId: resourceId(subscription().subscriptionId, parSpokeResourceGroupName, 'Microsoft.Network/virtualNetworks', parSpokeVirtualNetworkName)
+        allowForwardedTraffic: true
+        allowGatewayTransit: false
+        allowVirtualNetworkAccess: true
+        useRemoteGateways: false
+      }
+    ] : []
+  }
+  dependsOn: [
+    modResourceGroup
+  ]
+}
+
+module modPrivateDnsZone 'br/public:avm/res/network/private-dns-zone:0.8.0' = if (!empty(varContainerAppEnvDefaultDomain)) {
+  scope: resourceGroup(parResourceGroupName)
+  name: 'privateDnsZone'
+  params: {
+    name: varContainerAppEnvDefaultDomain
+    a: [
+      {
+        name: varContainerAppName
+        ttl: 3600
+        aRecords: [
+          { ipv4Address: parContainerAppStaticIp }
+        ]
+      }
+    ]
+    virtualNetworkLinks: [
+      {
+        virtualNetworkResourceId: modVirtualNetwork.outputs.resourceId
+        registrationEnabled: false
       }
     ]
   }
@@ -181,6 +224,9 @@ module modAppGateway 'br/public:avm/res/network/application-gateway:0.6.0' = {
           cookieBasedAffinity: 'Disabled'
           pickHostNameFromBackendAddress: true
           requestTimeout: 30
+          probe: {
+            id: resourceId(subscription().subscriptionId, parResourceGroupName, 'Microsoft.Network/applicationGateways/probes', parAppGatewayName, 'apim-health-probe')
+          }
         }
       }
       {
@@ -191,6 +237,41 @@ module modAppGateway 'br/public:avm/res/network/application-gateway:0.6.0' = {
           cookieBasedAffinity: 'Disabled'
           pickHostNameFromBackendAddress: true
           requestTimeout: 30
+          probe: {
+            id: resourceId(subscription().subscriptionId, parResourceGroupName, 'Microsoft.Network/applicationGateways/probes', parAppGatewayName, 'containerapp-health-probe')
+          }
+        }
+      }
+    ]
+    probes: [
+      {
+        name: 'apim-health-probe'
+        properties: {
+          protocol: 'Https'
+          path: '/status-0123456789abcdef'
+          interval: 30
+          timeout: 30
+          unhealthyThreshold: 3
+          pickHostNameFromBackendHttpSettings: true
+          minServers: 0
+          match: {
+            statusCodes: ['200-399']
+          }
+        }
+      }
+      {
+        name: 'containerapp-health-probe'
+        properties: {
+          protocol: 'Https'
+          path: '/health'
+          interval: 30
+          timeout: 30
+          unhealthyThreshold: 3
+          pickHostNameFromBackendHttpSettings: true
+          minServers: 0
+          match: {
+            statusCodes: ['200-399', '401']
+          }
         }
       }
     ]
@@ -218,7 +299,7 @@ module modAppGateway 'br/public:avm/res/network/application-gateway:0.6.0' = {
             id: resourceId(subscription().subscriptionId, parResourceGroupName, 'Microsoft.Network/applicationGateways/frontendPorts', parAppGatewayName, 'port-80')
           }
           protocol: 'Http'
-          hostName: 'app.${parAppGatewayName}.example.com'
+          hostName: parCustomDomain
         }
       }
     ]
