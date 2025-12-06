@@ -515,6 +515,34 @@ module modApim 'br/public:avm/res/api-management/service:0.12.0' = {
           'https'
         ]
         subscriptionRequired: true
+        subscriptionKeyParameterNames: {
+          header: 'api-key'
+        }
+        serviceUrl: ''
+        diagnostics: [
+          {
+            loggerName: modAppInsights.outputs.name
+          }
+        ]
+        policies: [
+          {
+            format: 'rawxml'
+            value: loadTextContent('policies/foundry-api.xml')
+          }
+        ]
+      }
+      {
+        name: 'grok'
+        displayName: 'Grok API'
+        path: 'grok'
+        apiType: 'http'
+        protocols: [
+          'https'
+        ]
+        subscriptionRequired: true
+        subscriptionKeyParameterNames: {
+          header: 'api-key'
+        }
         serviceUrl: ''
         diagnostics: [
           {
@@ -549,3 +577,13 @@ module modApim 'br/public:avm/res/api-management/service:0.12.0' = {
     modResourceGroup
   ]
 }
+
+output outApimName string = modApim.outputs.name
+output outApimResourceId string = modApim.outputs.resourceId
+output outApimSystemAssignedPrincipalId string = modApim.outputs.systemAssignedMIPrincipalId!
+output outAppInsightsConnectionString string = modAppInsights.outputs.connectionString
+output outAppInsightsResourceId string = modAppInsights.outputs.resourceId
+output outAppGatewayPublicIp string = modAppGatewayPublicIp.outputs.resourceId
+output outVirtualNetworkResourceId string = modVirtualNetwork.outputs.resourceId
+output outVirtualNetworkName string = modVirtualNetwork.outputs.name
+output outContainerAppFqdn string = parContainerAppFqdn

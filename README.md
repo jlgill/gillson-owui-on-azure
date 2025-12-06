@@ -37,7 +37,7 @@ az deployment sub create \
   --parameters infra/bicep/app.bicepparam
 ```
 
-### 2. Deploy Hub Resources (Application Gateway)
+### 2. Deploy Hub Resources (Application Gateway, API Management)
 
 ```bash
 az deployment sub create \
@@ -46,7 +46,28 @@ az deployment sub create \
   --parameters infra/bicep/main.bicepparam
 ```
 
-### 3. Configure Cloudflare DNS
+### 3. Import Foundry API OpenAPI Specification
+
+After the hub deployment completes, import the OpenAPI spec for the Foundry API:
+
+```bash
+# Get APIM details from deployment outputs
+APIM_NAME=$(az deployment sub show --name <deployment-name> --query properties.outputs.outApimName.value -o tsv)
+RESOURCE_GROUP=$(az deployment sub show --name <deployment-name> --query properties.outputs.outApimResourceId.value -o tsv | cut -d'/' -f5)
+
+# Import the OpenAPI specification
+az apim api import \
+  --resource-group $RESOURCE_GROUP \
+  --service-name $APIM_NAME \
+  --api-id foundry \
+  --path foundry \
+  --specification-format OpenApi \
+  --specification-path infra/bicep/openapi/foundry.openapi.json
+```
+
+> **Note**: The OpenAPI spec exceeds Bicep's inline size limit (131KB), so it must be imported post-deployment using Azure CLI.
+
+### 4. Configure Cloudflare DNS
 
 1. Add an A record pointing your custom domain to the Application Gateway public IP
 2. Enable **Proxy (orange cloud)**

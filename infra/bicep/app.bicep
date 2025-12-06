@@ -10,6 +10,7 @@ param parHubResourceGroupName string
 param parHubVirtualNetworkName string
 param parCustomDomain string
 param parCertificateName string
+param parApimPrincipalId string = ''
 
 var varOpenWebUiShare = 'open-webui-share'
 var varOpenWebUiApp = 'open-webui-app'
@@ -151,6 +152,10 @@ module modStorageAccount 'br/public:avm/res/storage/storage-account:0.29.0' = {
       systemAssigned: true
     }
     fileServices: {
+      shareDeleteRetentionPolicy: {
+        enabled: true
+        days: 7
+      }
       shares: [
         {
           name: varOpenWebUiShare
@@ -274,7 +279,7 @@ module modContainerApp 'br/public:avm/res/app/container-app:0.19.0' = {
         name: 'open-webui-share'
         storageName: varOpenWebUiShare
         storageType: 'AzureFile'
-        mountOptions: 'nobrl'
+        mountOptions: 'nobrl,noperm,mfsymlinks,cache=strict'
       }
     ]
     scaleSettings: {
@@ -406,19 +411,24 @@ module modFoundry 'br/public:avm/res/cognitive-services/account:0.14.0' = {
           }
         }
       ]
+    roleAssignments: concat(
+      [
+        {
+          principalId: modContainerApp.outputs.systemAssignedMIPrincipalId!
+          principalType: 'ServicePrincipal'
+          roleDefinitionIdOrName: '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
+        }
+      ],
+      !empty(parApimPrincipalId) ? [
+        {
+          principalId: parApimPrincipalId
+          principalType: 'ServicePrincipal'
+          roleDefinitionIdOrName: '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
+        }
+      ] : []
+    )
   }
   dependsOn: [modResourceGroup]
-}
-
-module modFoundryRbac 'br/public:avm/ptn/authorization/resource-role-assignment:0.1.2' = {
-  scope: resourceGroup(parResourceGroupName)
-  params: {
-    principalId: modContainerApp.outputs.systemAssignedMIPrincipalId!
-    roleName: 'Cognitive Services OpenAI User'
-    resourceId: modFoundry.outputs.resourceId
-    roleDefinitionId: '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
-    principalType: 'ServicePrincipal'
-  }
 }
 
 output outContainerAppFqdn string = modContainerApp.outputs.fqdn
