@@ -10,6 +10,7 @@ param parVirtualNetworkName string
 param parVirtualNetworkAddressPrefix string
 param parApimSubnetAddressPrefix string
 param parAppGatewaySubnetAddressPrefix string
+param parFoundryEndpoint string
 @validate(
   x => !contains(x, 'https://'), 'The Container App param FQDN must not contain the "https://" prefix.'
 )
@@ -19,11 +20,12 @@ param parSpokeResourceGroupName string
 param parSpokeVirtualNetworkName string
 param parCustomDomain string
 param parSpokeKeyVaultName string
+
 // Variables
 var varOpenWebUi = 'open-webui'
 var varNsgRules = loadJsonContent('nsg-rules.json')
-var varContainerAppEnvDefaultDomain = !empty(parContainerAppFqdn) ? join(skip(split(parContainerAppFqdn, '.'), 1), '.') : ''
-var varContainerAppName = !empty(parContainerAppFqdn) ? split(parContainerAppFqdn, '.')[0] : ''
+var varContainerAppEnvDefaultDomain = !empty(parContainerAppFqdn) ? join(skip(split(parContainerAppFqdn, '.'), 1), '.') : '' // if FQDN is myapp.uksouth.azurecontainerapps.io, this trims string to uksouth.azurecontainerapps.io
+var varContainerAppName = !empty(parContainerAppFqdn) ? split(parContainerAppFqdn, '.')[0] : '' // if FQDN is myapp.uksouth.azurecontainerapps.io, trims string to 'myapp'
 var varCloudflareOriginCaBase64 = loadTextContent('cloudflare-origin-ca.cer')
 
 module modResourceGroup 'br/public:avm/res/resources/resource-group:0.4.2' = {
@@ -153,7 +155,6 @@ module modAppGatewayPublicIp 'br/public:avm/res/network/public-ip-address:0.8.0'
 
 module modAppGatewayIdentity 'br/public:avm/res/managed-identity/user-assigned-identity:0.4.1' = if (!empty(parCustomDomain)) {
   scope: resourceGroup(parResourceGroupName)
-  name: 'appgw-identity'
   params: {
     name: '${parAppGatewayName}-identity'
     location: parLocation
@@ -163,7 +164,6 @@ module modAppGatewayIdentity 'br/public:avm/res/managed-identity/user-assigned-i
 
 module modHubKeyVault 'br/public:avm/res/key-vault/vault:0.13.3' = if (!empty(parCustomDomain)) {
   scope: resourceGroup(parResourceGroupName)
-  name: 'hub-keyvault'
   params: {
     name: 'kv-${parAppGatewayName}'
     location: parLocation
@@ -183,7 +183,6 @@ module modHubKeyVault 'br/public:avm/res/key-vault/vault:0.13.3' = if (!empty(pa
 
 module modAppGatewayKeyVaultRbac 'br/public:avm/ptn/authorization/resource-role-assignment:0.1.2' = if (!empty(parCustomDomain)) {
   scope: resourceGroup(parResourceGroupName)
-  name: 'appgw-keyvault-rbac'
   params: {
     principalId: modAppGatewayIdentity.outputs.principalId
     resourceId: modHubKeyVault.outputs.resourceId
@@ -193,7 +192,6 @@ module modAppGatewayKeyVaultRbac 'br/public:avm/ptn/authorization/resource-role-
 
 module modAppGatewaySpokeKeyVaultRbac 'br/public:avm/ptn/authorization/resource-role-assignment:0.1.2' = if (!empty(parCustomDomain) && !empty(parSpokeKeyVaultName)) {
   scope: resourceGroup(parSpokeResourceGroupName)
-  name: 'appgw-spoke-keyvault-rbac'
   params: {
     principalId: modAppGatewayIdentity.outputs.principalId
     resourceId: resourceId(subscription().subscriptionId, parSpokeResourceGroupName, 'Microsoft.KeyVault/vaults', parSpokeKeyVaultName)
@@ -496,6 +494,53 @@ module modApim 'br/public:avm/res/api-management/service:0.12.0' = {
     location: parLocation
     sku: 'Developer'
     virtualNetworkType: 'Internal'
+    backends: [
+      {
+        name: 'foundry-backend'
+        protocol: 'https'
+        url: parFoundryEndpoint
+        tls: {
+          validateCertificateChain: true
+          validateCertificateName: true
+        }
+      }
+    ]
+    apis: [
+      {
+        name: 'foundry'
+        displayName: 'Microsoft Foundry'
+        path: 'foundry'
+        apiType: 'http'
+        protocols: [
+          'https'
+        ]
+        subscriptionRequired: true
+        serviceUrl: ''
+        diagnostics: [
+          {
+            loggerName: modAppInsights.outputs.name
+          }
+        ]
+        policies: [
+          {
+            format: 'rawxml'
+            value: loadTextContent('policies/foundry-api.xml')
+          }
+        ]
+      }
+    ]
+    loggers: [
+      {
+        name: modAppInsights.outputs.name
+        type: 'applicationInsights'
+        description: 'Logger for Application Insights'
+        targetResourceId: modAppInsights.outputs.resourceId
+        credentials: {
+          connectionString: modAppInsights.outputs.connectionString
+          identity: 'SystemAssigned'
+        }
+      }
+    ]
     managedIdentities: {
       systemAssigned: true
     }

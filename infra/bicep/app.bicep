@@ -9,7 +9,7 @@ param parAcaSubnetAddressPrefix string
 param parHubResourceGroupName string
 param parHubVirtualNetworkName string
 param parCustomDomain string
-param parCertificateName string = 'cloudflare-origin-cert'
+param parCertificateName string
 
 var varOpenWebUiShare = 'open-webui-share'
 var varOpenWebUiApp = 'open-webui-app'
@@ -378,7 +378,31 @@ module modFoundry 'br/public:avm/res/cognitive-services/account:0.14.0' = {
           }
           sku: {
             name: 'Standard'
-            capacity: 10
+            capacity: 100
+          }
+        }
+        {
+          name: 'gpt-4o-mini'
+          model: {
+            format: 'OpenAI'
+            name: 'gpt-4o-mini'
+            version: '2024-07-18'
+          }
+          sku: {
+            name: 'GlobalStandard'
+            capacity: 100
+          }
+        }
+        {
+          name: 'grok-4-fast-reasoning'
+          model: {
+            format: 'xAI'
+            name: 'grok-4-fast-reasoning'
+            version: '1'
+          }
+          sku: {
+            name: 'GlobalStandard'
+            capacity: 100
           }
         }
       ]
@@ -402,3 +426,4 @@ output outContainerAppResourceId string = modContainerApp.outputs.resourceId
 output outContainerAppEnvDefaultDomain string = modContainerAppEnv.outputs.defaultDomain
 output outVirtualNetworkName string = modVirtualNetwork.outputs.name
 output outVirtualNetworkResourceId string = modVirtualNetwork.outputs.resourceId
+output outFoundryEndpoint string = modFoundry.outputs.endpoint
