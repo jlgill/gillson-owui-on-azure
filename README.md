@@ -96,6 +96,21 @@ The GPT-4o model will now appear in the model dropdown when starting a new chat.
 
 > **Note**: The connection uses Managed Identity authentication - no API keys required. The Container App's system-assigned identity has the `Cognitive Services OpenAI User` role on the AI Foundry resource.
 
+### Allow APIM egress on Foundry firewall (if using network ACLs)
+
+If your Foundry instance denies public traffic by default, allowlist the APIM gateway IPs:
+
+```bash
+APIM_IPS=$(az apim show \
+  --resource-group rg-lb-core \
+  --name apim-open-webui \
+  --query publicIpAddresses \
+  -o tsv)
+echo "$APIM_IPS"  # add these to Foundry firewall/IP rules
+```
+
+Then add the printed IPs to the Foundry firewall IP rules (or use a private endpoint for long-term private access).
+
 ## Scale to Zero Behaviour
 
 The Container App is configured with `minReplicas: 0` to minimise costs:

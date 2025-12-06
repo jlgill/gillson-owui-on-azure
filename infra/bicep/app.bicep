@@ -372,6 +372,11 @@ module modFoundry 'br/public:avm/res/cognitive-services/account:0.14.0' = {
           ignoreMissingVnetServiceEndpoint: false
         }
       ]
+      ipRules: [
+        {
+          value: '145.133.116.11' // APIM VIP PIP
+        }
+      ]
     }
     deployments: [
         {

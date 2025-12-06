@@ -1,13 +1,8 @@
 <policies>
   <inbound>
     <base />
-    <!-- Route to Foundry backend and authenticate with the APIM managed identity (must have Cognitive Services OpenAI User on Foundry account). -->
     <set-backend-service backend-id="foundry-backend" />
     <authentication-managed-identity resource="https://cognitiveservices.azure.com" />
-    <!-- Preserve original path/query when forwarding. -->
-    <rewrite-uri template="@(context.Request.OriginalUrl.PathAndQuery)" copy-unmatched-params="true" />
-    <!-- Basic per-subscription throttle; adjust as needed. -->
-    <rate-limit-by-key calls="300" renewal-period="60" counter-key="@(context.Subscription?.Key ?? 'anon')" />
   </inbound>
   <backend>
     <base />

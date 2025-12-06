@@ -497,7 +497,7 @@ module modApim 'br/public:avm/res/api-management/service:0.12.0' = {
     backends: [
       {
         name: 'foundry-backend'
-        protocol: 'https'
+        protocol: 'http'
         url: parFoundryEndpoint
         tls: {
           validateCertificateChain: true
@@ -509,7 +509,7 @@ module modApim 'br/public:avm/res/api-management/service:0.12.0' = {
       {
         name: 'foundry'
         displayName: 'Microsoft Foundry'
-        path: 'foundry'
+        path: 'foundry/models'
         apiType: 'http'
         protocols: [
           'https'
@@ -519,11 +519,7 @@ module modApim 'br/public:avm/res/api-management/service:0.12.0' = {
           header: 'api-key'
         }
         serviceUrl: ''
-        diagnostics: [
-          {
-            loggerName: modAppInsights.outputs.name
-          }
-        ]
+        diagnostics: []
         policies: [
           {
             format: 'rawxml'
@@ -544,11 +540,7 @@ module modApim 'br/public:avm/res/api-management/service:0.12.0' = {
           header: 'api-key'
         }
         serviceUrl: ''
-        diagnostics: [
-          {
-            loggerName: modAppInsights.outputs.name
-          }
-        ]
+        diagnostics: []
         policies: [
           {
             format: 'rawxml'
