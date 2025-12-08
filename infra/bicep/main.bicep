@@ -20,6 +20,7 @@ param parSpokeResourceGroupName string
 param parSpokeVirtualNetworkName string
 param parCustomDomain string
 param parSpokeKeyVaultName string
+param parOpenWebUIAppId string
 
 // Variables
 var varOpenWebUi = 'open-webui'
@@ -498,7 +499,16 @@ module modApim 'br/public:avm/res/api-management/service:0.12.0' = {
       {
         name: 'foundry-backend'
         protocol: 'http'
-        url: parFoundryEndpoint
+        url: '${parFoundryEndpoint}openai/v1'
+        tls: {
+          validateCertificateChain: true
+          validateCertificateName: true
+        }
+      }
+      {
+        name: 'foundry-models-backend'
+        protocol: 'http'
+        url: '${parFoundryEndpoint}models'
         tls: {
           validateCertificateChain: true
           validateCertificateName: true
@@ -518,8 +528,18 @@ module modApim 'br/public:avm/res/api-management/service:0.12.0' = {
         subscriptionKeyParameterNames: {
           header: 'api-key'
         }
-        serviceUrl: parFoundryEndpoint
-        diagnostics: []
+        diagnostics: [
+          {
+            name: 'applicationinsights'
+            loggerName: modAppInsights.outputs.name
+            alwaysLog: 'allErrors'
+            logClientIp: true
+            httpCorrelationProtocol: 'W3C'
+            verbosity: 'information'
+            samplingPercentage: 100
+            metrics: true
+          }
+        ]
         policies: [
           {
             format: 'rawxml'
@@ -529,9 +549,9 @@ module modApim 'br/public:avm/res/api-management/service:0.12.0' = {
         // az apim api import --resource-group rg-lb-core --service-name apim-open-webui --api-id openai --path openai/v1 --specification-format OpenApi --specification-path infra/bicep/openapi/openai.openapi.json
       }
       {
-        name: 'grok'
-        displayName: 'Grok API'
-        path: 'grok'
+        name: 'foundry'
+        displayName: 'Microsoft Foundry Models API'
+        path: 'foundry'
         apiType: 'http'
         protocols: [
           'https'
@@ -540,14 +560,25 @@ module modApim 'br/public:avm/res/api-management/service:0.12.0' = {
         subscriptionKeyParameterNames: {
           header: 'api-key'
         }
-        serviceUrl: ''
-        diagnostics: []
+        diagnostics:[
+          {
+            name: 'applicationinsights'
+            loggerName: modAppInsights.outputs.name
+            alwaysLog: 'allErrors'
+            logClientIp: true
+            httpCorrelationProtocol: 'W3C'
+            verbosity: 'information'
+            samplingPercentage: 100
+            metrics: true
+          }
+        ]
         policies: [
           {
             format: 'rawxml'
-            value: loadTextContent('policies/openai-api.xml')
+            value: loadTextContent('policies/foundry-api.xml')
           }
         ]
+        // az apim api import --resource-group rg-lb-core --service-name apim-open-webui --api-id foundry --path foundry --specification-format OpenApi --specification-path infra/bicep/openapi/foundry.openapi.json --service-url "https://openwebuiappfoundry.services.ai.azure.com/openai"
       }
     ]
     loggers: [
@@ -565,6 +596,20 @@ module modApim 'br/public:avm/res/api-management/service:0.12.0' = {
     managedIdentities: {
       systemAssigned: true
     }
+    namedValues: !empty(parOpenWebUIAppId) ? [
+      {
+        name: 'tenant-id'
+        displayName: 'tenant-id'
+        value: tenant().tenantId
+        secret: false
+      }
+      {
+        name: 'openwebui-app-id'
+        displayName: 'openwebui-app-id'
+        value: parOpenWebUIAppId
+        secret: false
+      }
+    ] : []
   }
   dependsOn: [modResourceGroup]
 }
@@ -582,6 +627,7 @@ module modApimMetricsPublisherRbac 'br/public:avm/ptn/authorization/resource-rol
 
 output outApimName string = modApim.outputs.name
 output outApimResourceId string = modApim.outputs.resourceId
+output outApimGatewayUrl string = 'https://${modApim.outputs.name}.azure-api.net'
 output outApimSystemAssignedPrincipalId string = modApim.outputs.systemAssignedMIPrincipalId!
 output outAppInsightsConnectionString string = modAppInsights.outputs.connectionString
 output outAppInsightsResourceId string = modAppInsights.outputs.resourceId

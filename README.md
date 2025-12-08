@@ -37,6 +37,12 @@ az deployment sub create \
   --parameters infra/bicep/app.bicepparam
 ```
 
+**Get the Open WebUI App Registration ID:**
+```bash
+az ad app list --display-name "app-open-webui" --query "[0].appId" -o tsv
+```
+Add this to `main.bicepparam` as `parOpenWebUIAppId`.
+
 ### 2. Deploy Hub Resources (Application Gateway, API Management)
 
 ```bash
@@ -46,26 +52,29 @@ az deployment sub create \
   --parameters infra/bicep/main.bicepparam
 ```
 
-### 3. Import Azure OpenAI Operations from OpenAPI Specification
+### 3. Import API Specifications
 
-The Bicep deployment creates the `openai` API with the policy, but the OpenAPI spec is too large to embed in Bicep. Import the operations after deployment:
-
+**OpenAI API:**
 ```bash
-# Set your values
-RESOURCE_GROUP="rg-lb-core"
-APIM_NAME="apim-open-webui"
-
-# Import the OpenAPI specification operations into the existing API
 az apim api import \
-  --resource-group $RESOURCE_GROUP \
-  --service-name $APIM_NAME \
+  --resource-group rg-lb-core \
+  --service-name apim-open-webui \
   --api-id openai \
   --path openai \
   --specification-format OpenApi \
   --specification-path infra/bicep/openapi/openai.openapi.json
 ```
 
-> **Note**: The Bicep creates the API shell with the policy (`openai-api-openwebui.xml`). This CLI command adds the 45+ operations from the OpenAPI spec. The policy uses Azure Foundry's v1 API for OpenAI compatibility.
+**Foundry Models API:**
+```bash
+az apim api import \
+  --resource-group rg-lb-core \
+  --service-name apim-open-webui \
+  --api-id foundry \
+  --path foundry \
+  --specification-format OpenApi \
+  --specification-path infra/bicep/openapi/foundry.openapi.json
+```
 
 ### 4. Configure Cloudflare DNS
 

@@ -11,6 +11,7 @@ param parHubVirtualNetworkName string
 param parCustomDomain string
 param parCertificateName string
 param parApimPrincipalId string = ''
+param parApimGatewayUrl string
 
 var varOpenWebUiShare = 'open-webui-share'
 var varOpenWebUiApp = 'open-webui-app'
@@ -20,13 +21,19 @@ resource entraIdApp 'Microsoft.Graph/applications@v1.0' = {
   displayName: varAppRegistrationName
   uniqueName: varAppRegistrationName
   signInAudience: 'AzureADMyOrg'
+  isFallbackPublicClient: true
   web: {
     redirectUris: [
-      'https://${parCustomDomain}/.auth/login/aad/callback'
+      'https://${parCustomDomain}/oauth/oidc/callback'
     ]
     implicitGrantSettings: {
       enableIdTokenIssuance: true
     }
+  }
+  publicClient: {
+    redirectUris: [
+      'https://${parCustomDomain}/oauth/oidc/callback'
+    ]
   }
   requiredResourceAccess: [
     {
@@ -259,6 +266,108 @@ module modContainerApp 'br/public:avm/res/app/container-app:0.19.0' = {
           cpu: 2
           memory: '4Gi'
         }
+        env: [
+          {
+            name: 'WEBUI_URL'
+            value: 'https://${parCustomDomain}'
+          }
+          {
+            name: 'ENABLE_OAUTH_SIGNUP'
+            value: 'true'
+          }
+          {
+            name: 'ENABLE_LOGIN_FORM'
+            value: 'false'
+          }
+          {
+            name: 'ENABLE_OAUTH_PERSISTENT_CONFIG'
+            value: 'false'
+          }
+          {
+            name: 'OAUTH_CLIENT_ID'
+            value: entraIdApp.appId
+          }
+          {
+            name: 'OAUTH_CODE_CHALLENGE_METHOD'
+            value: 'S256'
+          }
+          {
+            name: 'OAUTH_PROVIDER_NAME'
+            value: 'Microsoft'
+          }
+          {
+            name: 'OAUTH_SCOPES'
+            value: 'openid email profile'
+          }
+          {
+            name: 'OPENID_PROVIDER_URL'
+            value: '${environment().authentication.loginEndpoint}${tenant().tenantId}/v2.0/.well-known/openid-configuration'
+          }
+          {
+            name: 'OAUTH_UPDATE_PICTURE_ON_LOGIN'
+            value: 'true'
+          }
+          {
+            name: 'OPENAI_API_BASE_URL'
+            value: '${parApimGatewayUrl}/openai/v1'
+          }
+          {
+            name: 'ENV'
+            value: 'prod'
+          }
+          {
+            name: 'WEBUI_NAME'
+            value: 'Open WebUI'
+          }
+          {
+            name: 'ENABLE_SIGNUP'
+            value: 'false' 
+          }
+          {
+            name: 'DEFAULT_USER_ROLE'
+            value: 'user'
+          }
+          {
+            name: 'ENABLE_ADMIN_CHAT_ACCESS'
+            value: 'true'
+          }
+          {
+            name: 'ENABLE_ADMIN_EXPORT'
+            value: 'true'
+          }
+          {
+            name: 'WEBUI_SESSION_COOKIE_SAME_SITE'
+            value: 'lax' 
+          }
+          {
+            name: 'WEBUI_SESSION_COOKIE_SECURE'
+            value: 'true'
+          }
+          {
+            name: 'ENABLE_COMMUNITY_SHARING'
+            value: 'false'
+          }
+          {
+            name: 'ENABLE_MESSAGE_RATING'
+            value: 'true'
+          }
+          {
+            name: 'GLOBAL_LOG_LEVEL'
+            value: 'INFO'
+          }
+          {
+            name: 'ENABLE_OAUTH_ROLE_MANAGEMENT'
+            value: 'false'
+          }
+          {
+            name: 'ENABLE_OAUTH_GROUP_MANAGEMENT'
+            value: 'false'
+          }
+          {
+            name: 'AIOHTTP_CLIENT_TIMEOUT'
+            value: '300'
+          }
+        ]
         volumeMounts: [
           {
             volumeName: 'open-webui-share'
@@ -295,40 +404,6 @@ module modContainerApp 'br/public:avm/res/app/container-app:0.19.0' = {
           }
         }
       ]
-    }
-    authConfig: {
-      identityProviders: {
-        azureActiveDirectory: {
-          enabled: true
-          registration: {
-            clientId: entraIdApp.appId
-            openIdIssuer: '${environment().authentication.loginEndpoint}${tenant().tenantId}/v2.0'
-          }
-          validation: {
-            allowedAudiences: [
-              'api://${entraIdApp.appId}'
-            ]
-            defaultAuthorizationPolicy: {
-              allowedApplications: [
-                entraIdApp.appId
-              ]
-            }
-          }
-        }
-      }
-      httpSettings: {
-        requireHttps: true
-        forwardProxy: {
-          convention: 'Standard'
-        }
-      }
-      globalValidation: {
-        unauthenticatedClientAction: 'RedirectToLoginPage'
-        redirectToProvider: 'azureActiveDirectory'
-      }
-      platform: {
-        enabled: true
-      }
     }
     ingressAllowInsecure: false
     environmentResourceId: modContainerAppEnv.outputs.resourceId
@@ -442,3 +517,4 @@ output outContainerAppEnvDefaultDomain string = modContainerAppEnv.outputs.defau
 output outVirtualNetworkName string = modVirtualNetwork.outputs.name
 output outVirtualNetworkResourceId string = modVirtualNetwork.outputs.resourceId
 output outFoundryEndpoint string = modFoundry.outputs.endpoint
+output outOpenWebUIAppId string = entraIdApp.appId
