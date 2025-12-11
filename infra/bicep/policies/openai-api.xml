@@ -1,28 +1,19 @@
 <policies>
   <inbound>
     <base />
-    <choose>
-        <when condition="@(context.Variables.GetValueOrDefault("iss", "").Equals("https://login.microsoftonline.com/{{tenant-id}}/v2.0"))">
-        <validate-azure-ad-token tenant-id="{{tenant-id}}">
-          <client-application-ids>
-            <application-id>{{openwebui-app-id}}</application-id>
-          </client-application-ids>
-          <audiences>
-            <audience>https://cognitiveservices.azure.com</audience>
-          </audiences>
-        </validate-azure-ad-token>
-        <set-backend-service backend-id="foundry-backend" />
-        <authentication-managed-identity resource="https://cognitiveservices.azure.com" />
-      </when>
-      <otherwise>
-        <return-response>
-          <set-status code="401" reason="Unauthorized" />
-          <set-header name="Content-Type" exists-action="override">
-            <value>application/json</value>
-          </set-header>
-        </return-response>
-      </otherwise>
-    </choose>
+    <validate-azure-ad-token tenant-id="{{tenant-id}}">
+      <audiences>
+        <audience>{{openwebui-app-id}}</audience>
+      </audiences>
+      <required-claims>
+        <claim name="roles" match="any">
+          <value>admin</value>
+          <value>user</value>
+        </claim>
+      </required-claims>
+    </validate-azure-ad-token>
+    <set-backend-service backend-id="foundry-backend" />
+    <authentication-managed-identity resource="https://cognitiveservices.azure.com" />
   </inbound>
   <backend>
     <base />

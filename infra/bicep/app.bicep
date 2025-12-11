@@ -1,6 +1,6 @@
 targetScope = 'subscription'
 // ms graph extensibility
-extension 'br:mcr.microsoft.com/bicep/extensions/microsoftgraph/v1.0:0.1.8-preview'
+extension 'br:mcr.microsoft.com/bicep/extensions/microsoftgraph/v1.0:1.0.0'
 // Parameters
 param parLocation string = 'uksouth'
 param parResourceGroupName string
@@ -13,6 +13,8 @@ param parCertificateName string
 param parApimPrincipalId string
 param parApimGatewayUrl string
 param parApimAllowedIpAddresses array = []
+@description('List of allowed IP addresses for Container App ingress (CIDR format). Leave empty to allow all traffic.')
+param parContainerAppAllowedIpAddresses array = []
 type FoundryDeploymentType = {
   name: string
   model: {
@@ -30,18 +32,80 @@ param parFoundryDeployments FoundryDeploymentType[]
 var varOpenWebUiShare = 'open-webui-share'
 var varOpenWebUiApp = 'open-webui-app'
 var varAppRegistrationName = 'app-open-webui'
+var varIpSecurityRestrictions = [for ip in parContainerAppAllowedIpAddresses: {
+  name: 'allow-${replace(ip, '/', '-')}'
+  ipAddressRange: ip
+  action: 'Allow'
+}]
 
 resource entraIdApp 'Microsoft.Graph/applications@v1.0' = {
   displayName: varAppRegistrationName
   uniqueName: varAppRegistrationName
   signInAudience: 'AzureADMyOrg'
   isFallbackPublicClient: true
+  groupMembershipClaims: 'SecurityGroup'
+  identifierUris: ['api://${varAppRegistrationName}']
+  owners: {
+    relationships: [
+      deployer().objectId
+    ]
+  }
+  appRoles: [
+    {
+      allowedMemberTypes: ['User']
+      description: 'Administrator role with full access to Open WebUI'
+      displayName: 'Administrator'
+      id: guid(varAppRegistrationName, 'admin')
+      isEnabled: true
+      value: 'admin'
+    }
+    {
+      allowedMemberTypes: ['User']
+      description: 'Standard user role with default permissions'
+      displayName: 'User'
+      id: guid(varAppRegistrationName, 'user')
+      isEnabled: true
+      value: 'user'
+    }
+  ]
+  optionalClaims: {
+    idToken: [
+      {
+        name: 'groups'
+        essential: false
+        additionalProperties: []
+      }
+    ]
+    accessToken: [
+      {
+        name: 'groups'
+        essential: false
+        additionalProperties: []
+      }
+    ]
+  }
+  api: {
+    requestedAccessTokenVersion: 2
+    oauth2PermissionScopes: [
+      {
+        adminConsentDescription: 'Allow the application to access Open WebUI on behalf of the signed-in user'
+        adminConsentDisplayName: 'Access Open WebUI'
+        id: guid(varAppRegistrationName, 'user_impersonation')
+        isEnabled: true
+        type: 'User'
+        userConsentDescription: 'Allow the application to access Open WebUI on your behalf'
+        userConsentDisplayName: 'Access Open WebUI'
+        value: 'user_impersonation'
+      }
+    ]
+  }
   web: {
     redirectUris: [
       'https://${parCustomDomain}/oauth/oidc/callback'
     ]
     implicitGrantSettings: {
       enableIdTokenIssuance: true
+      enableAccessTokenIssuance: true
     }
   }
   publicClient: {
@@ -54,7 +118,11 @@ resource entraIdApp 'Microsoft.Graph/applications@v1.0' = {
       resourceAppId: '00000003-0000-0000-c000-000000000000' // Microsoft Graph
       resourceAccess: [
         {
-          id: 'e1fe6dd8-ba31-4d61-89e7-88639da4683d' // User.Read
+          id: 'e1fe6dd8-ba31-4d61-89e7-88639da4683d' // User.Read (Delegated)
+          type: 'Scope'
+        }
+        {
+          id: 'bc024368-1153-4739-b217-4326f2e966d0' // GroupMember.Read.All (Delegated)
           type: 'Scope'
         }
       ]
@@ -64,6 +132,7 @@ resource entraIdApp 'Microsoft.Graph/applications@v1.0' = {
 
 resource entraIdServicePrincipal 'Microsoft.Graph/servicePrincipals@v1.0' = {
   appId: entraIdApp.appId
+
 }
 
 module modResourceGroup 'br/public:avm/res/resources/resource-group:0.4.2' = {
@@ -265,6 +334,7 @@ module modContainerApp 'br/public:avm/res/app/container-app:0.19.0' = {
   params: {
     name: '${varOpenWebUiApp}-aca'
     ingressTargetPort: 8080
+    ipSecurityRestrictions: !empty(parContainerAppAllowedIpAddresses) ? varIpSecurityRestrictions : []
     customDomains: [
       {
         name: parCustomDomain
@@ -307,11 +377,11 @@ module modContainerApp 'br/public:avm/res/app/container-app:0.19.0' = {
           }
           {
             name: 'OAUTH_PROVIDER_NAME'
-            value: 'Microsoft'
+            value: 'Microsoft Entra ID'
           }
           {
             name: 'OAUTH_SCOPES'
-            value: 'openid email profile'
+            value: 'openid email profile api://${varAppRegistrationName}/user_impersonation User.Read GroupMember.Read.All'
           }
           {
             name: 'OPENID_PROVIDER_URL'
@@ -322,12 +392,24 @@ module modContainerApp 'br/public:avm/res/app/container-app:0.19.0' = {
             value: 'true'
           }
           {
+            name: 'OAUTH_EMAIL_CLAIM'
+            value: 'email'
+          }
+          {
+            name: 'OAUTH_USERNAME_CLAIM'
+            value: 'name'
+          }
+          {
             name: 'OPENAI_API_BASE_URL'
             value: '${parApimGatewayUrl}/openai/v1'
           }
           {
             name: 'ENV'
             value: 'prod'
+          }
+          {
+            name: 'DATA_DIR'
+            value: '/app/data'
           }
           {
             name: 'WEBUI_NAME'
@@ -371,11 +453,31 @@ module modContainerApp 'br/public:avm/res/app/container-app:0.19.0' = {
           }
           {
             name: 'ENABLE_OAUTH_ROLE_MANAGEMENT'
-            value: 'false'
+            value: 'true'
+          }
+          {
+            name: 'OAUTH_ROLES_CLAIM'
+            value: 'roles'
+          }
+          {
+            name: 'OAUTH_ALLOWED_ROLES'
+            value: 'user,admin'
+          }
+          {
+            name: 'OAUTH_ADMIN_ROLES'
+            value: 'admin'
           }
           {
             name: 'ENABLE_OAUTH_GROUP_MANAGEMENT'
-            value: 'false'
+            value: 'true'
+          }
+          {
+            name: 'ENABLE_OAUTH_GROUP_CREATION'
+            value: 'true'
+          }
+          {
+            name: 'OAUTH_GROUPS_CLAIM'
+            value: 'groups'
           }
           {
             name: 'AIOHTTP_CLIENT_TIMEOUT'

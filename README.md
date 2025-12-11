@@ -43,6 +43,14 @@ az ad app list --display-name "app-open-webui" --query "[0].appId" -o tsv
 ```
 Add this to `main.bicepparam` as `parOpenWebUIAppId`.
 
+**Grant Admin Consent for Microsoft Graph API Permissions:**
+
+The app registration requires Microsoft Graph permissions for group sync and profile pictures. Grant admin consent in the Azure Portal:
+
+1. Navigate to **Entra ID** → **App registrations** → **app-open-webui**
+2. Go to **API permissions**
+3. Click **Grant admin consent for [Your Tenant]**
+
 ### 2. Deploy Hub Resources (Application Gateway, API Management)
 
 ```bash
@@ -155,13 +163,17 @@ The Container App is configured with `minReplicas: 0` to minimise costs:
 - Cold start time: 10-30+ seconds (container image is ~1GB)
 - Set `minReplicas: 1` in `app.bicep` for always-on behaviour
 
-## Documentation
+## Security Notes
 
-- [Custom Domain with EasyAuth](docs/custom-domain-easyauth.md) - Detailed guide for configuring custom domains with Entra ID authentication behind Application Gateway
+**Current Configuration (Development/Personal Use):**
+- Container App ingress restricted to authorized IPs via `parContainerAppAllowedIpAddresses`
+- Public access via Application Gateway with Entra ID authentication
+- Scale-to-zero enabled for cost optimization
 
-## Resources
-
-- [Open WebUI Documentation](https://docs.openwebui.com/)
-- [Azure Container Apps](https://learn.microsoft.com/azure/container-apps/)
-- [Azure AI Foundry](https://learn.microsoft.com/azure/ai-services/)
-- [Azure Verified Modules](https://azure.github.io/Azure-Verified-Modules/)
+**Production/Enterprise Recommendations:**
+- Remove public Container App FQDN exposure entirely (internal ingress only)
+- Use Azure VPN/ExpressRoute or Private Link for private access
+- Set `minReplicas: 2` for high availability and eliminate cold starts
+- Enable WAF (Web Application Firewall) on Application Gateway
+- Implement Azure DDoS Protection Standard
+- Replace IP allowlists with network segmentation and centralized identity

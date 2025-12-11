@@ -13,6 +13,11 @@ param parApimAllowedIpAddresses = [
 	'145.133.116.11' // APIM VIP - New Foundry doesn't support end to end private networking yet.
 ]
 
+param parContainerAppAllowedIpAddresses = [
+	'188.74.98.58/32' // My IP for testing
+	'10.0.0.64/26' // App Gateway subnet
+]
+
 param parFoundryDeployments = [
 	{
 		name: 'gpt-4o'
@@ -22,7 +27,7 @@ param parFoundryDeployments = [
 			version: '2024-11-20'
 		}
 		sku: {
-			name: 'Standard'
+			name: 'GlobalStandard'
 			capacity: 100
 		}
 	}
@@ -39,11 +44,11 @@ param parFoundryDeployments = [
 		}
 	}
 	{
-		name: 'llama-4-maverick-17b-128e-instruct-fp8'
+		name: 'gpt-5-mini'
 		model: {
-			format: 'meta'
-			name: 'llama-4-maverick-17b-128e-instruct-fp8'
-			version: '1'
+			format: 'OpenAI'
+			name: 'gpt-5-mini'
+			version: '2025-08-07'
 		}
 		sku: {
 			name: 'GlobalStandard'
@@ -53,7 +58,7 @@ param parFoundryDeployments = [
 	{
 		name: 'Mistral-Large-3'
 		model: {
-			format: 'mistral'
+			format: 'Mistral AI'
 			name: 'Mistral-Large-3'
 			version: '1'
 		}
@@ -65,7 +70,7 @@ param parFoundryDeployments = [
 	{
 		name: 'mistral-document-ai-2505'
 		model: {
-			format: 'mistral'
+			format: 'Mistral AI'
 			name: 'mistral-document-ai-2505'
 			version: '1'
 		}
@@ -77,13 +82,13 @@ param parFoundryDeployments = [
 	{
 		name: 'FLUX-1.1-pro'
 		model: {
-			format: 'flux'
+			format: 'Black Forest Labs'
 			name: 'FLUX-1.1-pro'
 			version: '1'
 		}
 		sku: {
 			name: 'GlobalStandard'
-			capacity: 100
+			capacity: 50
 		}
 	}
 ]
