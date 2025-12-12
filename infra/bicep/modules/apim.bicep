@@ -18,7 +18,6 @@ param parRedisCacheConnectionString string = ''
 
 // Load policy files
 var varOpenAIPolicyXml = loadTextContent('../policies/openai-api.xml')
-var varFoundryPolicyXml = loadTextContent('../policies/foundry-api.xml')
 
 // API Management Service
 module modApim 'br/public:avm/res/api-management/service:0.12.0' = {
@@ -36,15 +35,6 @@ module modApim 'br/public:avm/res/api-management/service:0.12.0' = {
         name: 'foundry-backend'
         protocol: 'http'
         url: '${parFoundryEndpoint}openai/v1'
-        tls: {
-          validateCertificateChain: true
-          validateCertificateName: true
-        }
-      }
-      {
-        name: 'foundry-models-backend'
-        protocol: 'http'
-        url: '${parFoundryEndpoint}models'
         tls: {
           validateCertificateChain: true
           validateCertificateName: true
@@ -83,37 +73,6 @@ module modApim 'br/public:avm/res/api-management/service:0.12.0' = {
           }
         ]
       }
-      {
-        name: 'foundry'
-        displayName: 'Microsoft Foundry Models API'
-        path: 'foundry'
-        apiType: 'http'
-        protocols: [
-          'https'
-        ]
-        subscriptionRequired: true
-        subscriptionKeyParameterNames: {
-          header: 'api-key'
-        }
-        diagnostics: [
-          {
-            name: 'applicationinsights'
-            loggerName: parAppInsightsName
-            alwaysLog: 'allErrors'
-            logClientIp: true
-            httpCorrelationProtocol: 'W3C'
-            verbosity: 'information'
-            samplingPercentage: 100
-            metrics: true
-          }
-        ]
-        policies: [
-          {
-            format: 'rawxml'
-            value: varFoundryPolicyXml
-          }
-        ]
-      }
     ]
     products: [
       {
@@ -125,7 +84,6 @@ module modApim 'br/public:avm/res/api-management/service:0.12.0' = {
         state: 'published'
         apis: [
           'openai'
-          'foundry'
         ]
       }
     ]

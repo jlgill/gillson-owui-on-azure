@@ -5,7 +5,6 @@ targetScope = 'resourceGroup'
 param parAppGatewayName string
 param parLocation string
 param parContainerAppFqdn string
-param parContainerAppEnvDefaultDomain string
 param parCustomDomain string
 param parSpokeKeyVaultName string
 param parTrustedRootCertificateSecretName string
@@ -118,14 +117,13 @@ module modAppGateway 'br/public:avm/res/network/application-gateway:0.6.0' = {
         properties: {
           protocol: 'Https'
           path: '/'
-          interval: 300
+          interval: 30
           timeout: 30
           unhealthyThreshold: 3
-          pickHostNameFromBackendHttpSettings: false
-          host: 'ingress.${parContainerAppEnvDefaultDomain}'
+          pickHostNameFromBackendHttpSettings: true
           minServers: 0
           match: {
-            statusCodes: ['200-499']
+            statusCodes: ['200-399']
           }
         }
       }

@@ -68,27 +68,15 @@ param parFoundryDeployments = [
 		}
 	}
 	{
-		name: 'mistral-document-ai-2505'
+		name: 'Llama-4-Maverick-17B-128E-Instruct-FP8'
 		model: {
-			format: 'Mistral AI'
-			name: 'mistral-document-ai-2505'
+			format: 'Meta'
+			name: 'Llama-4-Maverick-17B-128E-Instruct-FP8'
 			version: '1'
 		}
 		sku: {
 			name: 'GlobalStandard'
 			capacity: 100
-		}
-	}
-	{
-		name: 'FLUX-1.1-pro'
-		model: {
-			format: 'Black Forest Labs'
-			name: 'FLUX-1.1-pro'
-			version: '1'
-		}
-		sku: {
-			name: 'GlobalStandard'
-			capacity: 50
 		}
 	}
 ]

@@ -62,29 +62,7 @@ az deployment sub create \
 
 ### 3. Import API Specifications
 
-**OpenAI API:**
-```bash
-az apim api import \
-  --resource-group rg-lb-core \
-  --service-name apim-open-webui \
-  --api-id openai \
-  --path openai \
-  --specification-format OpenApi \
-  --specification-path infra/bicep/openapi/openai.openapi.json
-```
-
-**Foundry Models API:**
-```bash
-az apim api import \
-  --resource-group rg-lb-core \
-  --service-name apim-open-webui \
-  --api-id foundry \
-  --path foundry \
-  --specification-format OpenApi \
-  --specification-path infra/bicep/openapi/foundry.openapi.json
-```
-
-### 4. Configure Cloudflare DNS
+### 3. Configure Cloudflare DNS
 
 1. Add an A record pointing your custom domain to the Application Gateway public IP
 2. Enable **Proxy (orange cloud)**
@@ -111,22 +89,7 @@ After deployment, configure Open WebUI to call Azure OpenAI through your APIM ga
 
 6. Click **Save** and **Verify Connection**
 
-### Adding Foundry Models Endpoint
-
-To enable model discovery via the Foundry `/models` endpoint:
-
-1. In Open WebUI, go to **Admin Settings** → **Connections**
-2. Edit your APIM connection or add a new one
-3. Use the Foundry API path:
-
-| Field | Value |
-|-------|-------|
-| **Name** | `Azure Foundry Models` |
-| **API Base URL** | `https://apim-open-webui.azure-api.net/foundry` |
-| **API Key** | (Same APIM subscription key) |
-| **API Type** | `OpenAI` |
-
-This endpoint will return all deployed models in your Foundry instance. Open WebUI will automatically discover and list them in the model dropdown.
+> **Note**: Foundry doesn't expose a `/models` endpoint for automatic model discovery. You'll need to manually add your deployed models in Open WebUI under **Admin Settings** → **Models** (e.g., `gpt-4o`, `gpt-4o-mini`, `Mistral-Large-3`, `FLUX-1.1-pro`).
 
 ### Getting Your APIM Subscription Key
 
@@ -180,22 +143,12 @@ The Container App is configured with `minReplicas: 0` to minimize costs:
 - Cold start time: 10-30+ seconds (container image is ~1GB)
 - Set `minReplicas: 1` in `app.bicep` for always-on behavior
 
-### Application Gateway Health Probe Workaround
-
-To enable scale-to-zero with Application Gateway, the health probe is configured to check the **Container App Environment ingress** (Envoy) rather than the application itself:
-
-- **Probe Host:** `ingress.{environmentDomain}` (e.g., `ingress.jollyfield-adf491b7.uksouth.azurecontainerapps.io`)
-- **Accepted Status Codes:** `200-499` (ingress returns 403 when no app matches, which is healthy)
-- **Probe Interval:** 300 seconds (5 minutes)
-
-This allows the app to scale to zero while the ingress (which doesn't scale) continues to respond to health probes. See [Azure Container Apps Issue #1090](https://github.com/microsoft/azure-container-apps/issues/1090) for more details.
-
 ## Security Notes
 
 **Current Configuration (Development/Personal Use):**
 - Container App ingress restricted to authorized IPs via `parContainerAppAllowedIpAddresses`
 - Public access via Application Gateway with Entra ID authentication
-- Scale-to-zero enabled for cost optimization
+- `minReplicas: 1` to ensure backend availability (scale-to-zero not compatible with App Gateway)
 
 **Production/Enterprise Recommendations:**
 - Remove public Container App FQDN exposure entirely (internal ingress only)

@@ -40,7 +40,6 @@ module modRedisCache 'br/public:avm/res/cache/redis:0.16.4' = {
     tags: parTags
     skuName: 'Standard'
     capacity: 1
-    disableAccessKeyAuthentication: true
     enableNonSslPort: false
     minimumTlsVersion: '1.2'
     publicNetworkAccess: 'Disabled'
