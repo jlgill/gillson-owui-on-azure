@@ -510,16 +510,6 @@ module modContainerApp 'br/public:avm/res/app/container-app:0.19.0' = {
     scaleSettings: {
       maxReplicas: 1
       minReplicas: 0
-      rules: [
-        {
-          name: 'http-rule'
-          http: {
-            metadata: {
-              concurrentRequests: '10'
-            }
-          }
-        }
-      ]
     }
     ingressAllowInsecure: false
     environmentResourceId: modContainerAppEnv.outputs.resourceId

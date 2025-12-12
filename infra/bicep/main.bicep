@@ -10,6 +10,7 @@ param parVirtualNetworkName string
 param parVirtualNetworkAddressPrefix string
 param parApimSubnetAddressPrefix string
 param parAppGatewaySubnetAddressPrefix string
+param parRedisCacheSubnetAddressPrefix string = '10.0.0.128/28'
 param parSpokeResourceGroupName string
 param parSpokeVirtualNetworkName string
 @validate(
@@ -47,6 +48,7 @@ module modNetworking 'modules/networking.bicep' = {
     parVirtualNetworkAddressPrefix: parVirtualNetworkAddressPrefix
     parApimSubnetAddressPrefix: parApimSubnetAddressPrefix
     parAppGatewaySubnetAddressPrefix: parAppGatewaySubnetAddressPrefix
+    parRedisCacheSubnetAddressPrefix: parRedisCacheSubnetAddressPrefix
     parSpokeResourceGroupName: parSpokeResourceGroupName
     parSpokeVirtualNetworkName: parSpokeVirtualNetworkName
     parContainerAppEnvDefaultDomain: varContainerAppEnvDefaultDomain
@@ -112,10 +114,35 @@ module modApimPublicIp 'br/public:avm/res/network/public-ip-address:0.8.0' = {
     zones: []
     skuName: 'Standard'
     publicIPAllocationMethod: 'Static'
+    dnsSettings: {
+      domainNameLabel: 'apim-${parApimName}-${uniqueString(subscription().subscriptionId, parResourceGroupName)}'
+    }
   }
   dependsOn: [
     modResourceGroup
   ]
+}
+
+// ========== Redis Cache for AI Gateway ==========
+module modRedisCache 'modules/cache.bicep' = {
+  scope: resourceGroup(parResourceGroupName)
+  params: {
+    parCacheName: 'redis-${parApimName}'
+    parLocation: parLocation
+    parSubnetResourceId: modNetworking.outputs.redisCacheSubnetResourceId
+    parHubVnetResourceId: modNetworking.outputs.virtualNetworkResourceId
+    parSpokeVnetResourceId: resourceId(subscription().subscriptionId, parSpokeResourceGroupName, 'Microsoft.Network/virtualNetworks', parSpokeVirtualNetworkName)
+  }
+  dependsOn: [
+    modResourceGroup
+  ]
+}
+
+// Reference deployed Redis cache to get keys
+resource resRedisCache 'Microsoft.Cache/redis@2023-08-01' existing = {
+  scope: resourceGroup(parResourceGroupName)
+  name: 'redis-${parApimName}'
+  dependsOn: [modRedisCache]
 }
 
 // ========== Application Gateway ==========
@@ -124,7 +151,6 @@ module modAppGateway 'modules/app-gateway.bicep' = {
   params: {
     parAppGatewayName: parAppGatewayName
     parLocation: parLocation
-    parApimName: parApimName
     parContainerAppFqdn: parContainerAppFqdn
     parCustomDomain: parCustomDomain
     parSpokeKeyVaultName: parSpokeKeyVaultName
@@ -157,10 +183,36 @@ module modApim 'modules/apim.bicep' = {
     parLogAnalyticsWorkspaceResourceId: modMonitoring.outputs.logAnalyticsWorkspaceResourceId
     parApimSubnetResourceId: modNetworking.outputs.apimSubnetResourceId
     parApimPublicIpResourceId: modApimPublicIp.outputs.resourceId
+    parRedisCacheConnectionString: '${modRedisCache.outputs.hostName}:${modRedisCache.outputs.sslPort},password=${resRedisCache.listKeys().primaryKey},ssl=True,abortConnect=False'
   }
   dependsOn: [
     modResourceGroup
   ]
+}
+
+// ========== APIM Private DNS A Record (after APIM deployment) ==========
+// Get existing APIM resource to read its private IP
+resource resApimExisting 'Microsoft.ApiManagement/service@2023-05-01-preview' existing = {
+  scope: resourceGroup(parResourceGroupName)
+  name: parApimName
+}
+
+module modApimDnsRecord 'br/public:avm/res/network/private-dns-zone:0.8.0' = {
+  scope: resourceGroup(parResourceGroupName)
+  name: 'apimDnsRecord'
+  params: {
+    name: modNetworking.outputs.apimPrivateDnsZoneName
+    location: 'global'
+    a: [
+      {
+        name: parApimName
+        ttl: 3600
+        aRecords: [
+          { ipv4Address: resApimExisting.properties.privateIPAddresses[0] }
+        ]
+      }
+    ]
+  }
 }
 
 // ========== Outputs ==========

@@ -7,6 +7,7 @@ param parVirtualNetworkName string
 param parVirtualNetworkAddressPrefix string
 param parApimSubnetAddressPrefix string
 param parAppGatewaySubnetAddressPrefix string
+param parRedisCacheSubnetAddressPrefix string
 param parSpokeResourceGroupName string
 param parSpokeVirtualNetworkName string
 param parContainerAppEnvDefaultDomain string
@@ -40,6 +41,11 @@ module modVirtualNetwork 'br/public:avm/res/network/virtual-network:0.7.1' = {
       {
         name: 'appgw-subnet'
         addressPrefix: parAppGatewaySubnetAddressPrefix
+      }
+      {
+        name: 'redis-subnet'
+        addressPrefix: parRedisCacheSubnetAddressPrefix
+        privateEndpointNetworkPolicies: 'Disabled'
       }
     ]
     peerings: !empty(parSpokeVirtualNetworkName) ? [
@@ -78,9 +84,30 @@ module modPrivateDnsZone 'br/public:avm/res/network/private-dns-zone:0.8.0' = if
   }
 }
 
+// Private DNS Zone for APIM (Internal mode) - A record will be created after APIM deployment
+module modApimPrivateDnsZone 'br/public:avm/res/network/private-dns-zone:0.8.0' = {
+  name: 'apimPrivateDnsZone'
+  params: {
+    name: 'azure-api.net'
+    location: 'global'
+    virtualNetworkLinks: [
+      {
+        virtualNetworkResourceId: modVirtualNetwork.outputs.resourceId
+        registrationEnabled: false
+      }
+      {
+        virtualNetworkResourceId: resourceId(subscription().subscriptionId, parSpokeResourceGroupName, 'Microsoft.Network/virtualNetworks', parSpokeVirtualNetworkName)
+        registrationEnabled: false
+      }
+    ]
+  }
+}
+
 // Outputs
 output virtualNetworkResourceId string = modVirtualNetwork.outputs.resourceId
 output virtualNetworkName string = modVirtualNetwork.outputs.name
 output subnetResourceIds array = modVirtualNetwork.outputs.subnetResourceIds
 output apimSubnetResourceId string = modVirtualNetwork.outputs.subnetResourceIds[0]
 output appGatewaySubnetResourceId string = modVirtualNetwork.outputs.subnetResourceIds[1]
+output redisCacheSubnetResourceId string = modVirtualNetwork.outputs.subnetResourceIds[2]
+output apimPrivateDnsZoneName string = modApimPrivateDnsZone.outputs.name

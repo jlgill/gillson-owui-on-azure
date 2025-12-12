@@ -4,7 +4,6 @@ targetScope = 'resourceGroup'
 // Parameters
 param parAppGatewayName string
 param parLocation string
-param parApimName string
 param parContainerAppFqdn string
 param parCustomDomain string
 param parSpokeKeyVaultName string
@@ -81,16 +80,6 @@ module modAppGateway 'br/public:avm/res/network/application-gateway:0.6.0' = {
     ]
     backendAddressPools: [
       {
-        name: 'apim-backend-pool'
-        properties: {
-          backendAddresses: [
-            {
-              fqdn: '${parApimName}.azure-api.net'
-            }
-          ]
-        }
-      }
-      {
         name: 'containerapp-backend-pool'
         properties: {
           backendAddresses: !empty(parContainerAppFqdn) ? [
@@ -102,19 +91,6 @@ module modAppGateway 'br/public:avm/res/network/application-gateway:0.6.0' = {
       }
     ]
     backendHttpSettingsCollection: [
-      {
-        name: 'apim-backend-settings'
-        properties: {
-          port: 443
-          protocol: 'Https'
-          cookieBasedAffinity: 'Disabled'
-          pickHostNameFromBackendAddress: true
-          requestTimeout: 30
-          probe: {
-            id: resourceId(subscription().subscriptionId, parResourceGroupName, 'Microsoft.Network/applicationGateways/probes', parAppGatewayName, 'apim-health-probe')
-          }
-        }
-      }
       {
         name: 'containerapp-backend-settings'
         properties: {
@@ -137,26 +113,11 @@ module modAppGateway 'br/public:avm/res/network/application-gateway:0.6.0' = {
     ]
     probes: [
       {
-        name: 'apim-health-probe'
-        properties: {
-          protocol: 'Https'
-          path: '/status-0123456789abcdef'
-          interval: 30
-          timeout: 30
-          unhealthyThreshold: 3
-          pickHostNameFromBackendHttpSettings: true
-          minServers: 0
-          match: {
-            statusCodes: ['200-399']
-          }
-        }
-      }
-      {
         name: 'containerapp-health-probe'
         properties: {
           protocol: 'Https'
           path: '/health'
-          interval: 30
+          interval: 300
           timeout: 30
           unhealthyThreshold: 3
           pickHostNameFromBackendHttpSettings: !empty(parCustomDomain) ? false : true
@@ -169,19 +130,6 @@ module modAppGateway 'br/public:avm/res/network/application-gateway:0.6.0' = {
       }
     ]
     httpListeners: [
-      {
-        name: 'apim-http-listener'
-        properties: {
-          frontendIPConfiguration: {
-            id: resourceId(subscription().subscriptionId, parResourceGroupName, 'Microsoft.Network/applicationGateways/frontendIPConfigurations', parAppGatewayName, 'appgw-frontend-ip')
-          }
-          frontendPort: {
-            id: resourceId(subscription().subscriptionId, parResourceGroupName, 'Microsoft.Network/applicationGateways/frontendPorts', parAppGatewayName, 'port-80')
-          }
-          protocol: 'Http'
-          hostName: 'api.${parAppGatewayName}.example.com'
-        }
-      }
       {
         name: 'containerapp-http-listener'
         properties: {
@@ -214,26 +162,10 @@ module modAppGateway 'br/public:avm/res/network/application-gateway:0.6.0' = {
     ]
     requestRoutingRules: [
       {
-        name: 'apim-routing-rule'
-        properties: {
-          ruleType: 'Basic'
-          priority: 100
-          httpListener: {
-            id: resourceId(subscription().subscriptionId, parResourceGroupName, 'Microsoft.Network/applicationGateways/httpListeners', parAppGatewayName, 'apim-http-listener')
-          }
-          backendAddressPool: {
-            id: resourceId(subscription().subscriptionId, parResourceGroupName, 'Microsoft.Network/applicationGateways/backendAddressPools', parAppGatewayName, 'apim-backend-pool')
-          }
-          backendHttpSettings: {
-            id: resourceId(subscription().subscriptionId, parResourceGroupName, 'Microsoft.Network/applicationGateways/backendHttpSettingsCollection', parAppGatewayName, 'apim-backend-settings')
-          }
-        }
-      }
-      {
         name: 'containerapp-routing-rule'
         properties: {
           ruleType: 'Basic'
-          priority: 200
+          priority: 100
           httpListener: {
             id: resourceId(subscription().subscriptionId, parResourceGroupName, 'Microsoft.Network/applicationGateways/httpListeners', parAppGatewayName, 'containerapp-http-listener')
           }
@@ -243,16 +175,13 @@ module modAppGateway 'br/public:avm/res/network/application-gateway:0.6.0' = {
           backendHttpSettings: {
             id: resourceId(subscription().subscriptionId, parResourceGroupName, 'Microsoft.Network/applicationGateways/backendHttpSettingsCollection', parAppGatewayName, 'containerapp-backend-settings')
           }
-          rewriteRuleSet: !empty(parCustomDomain) ? {
-            id: resourceId(subscription().subscriptionId, parResourceGroupName, 'Microsoft.Network/applicationGateways/rewriteRuleSets', parAppGatewayName, 'containerapp-rewrite-rules')
-          } : null
         }
       }
       {
         name: 'containerapp-https-routing-rule'
         properties: {
           ruleType: 'Basic'
-          priority: 201
+          priority: 101
           httpListener: {
             id: resourceId(subscription().subscriptionId, parResourceGroupName, 'Microsoft.Network/applicationGateways/httpListeners', parAppGatewayName, 'containerapp-https-listener')
           }
@@ -262,39 +191,9 @@ module modAppGateway 'br/public:avm/res/network/application-gateway:0.6.0' = {
           backendHttpSettings: {
             id: resourceId(subscription().subscriptionId, parResourceGroupName, 'Microsoft.Network/applicationGateways/backendHttpSettingsCollection', parAppGatewayName, 'containerapp-backend-settings')
           }
-          rewriteRuleSet: !empty(parCustomDomain) ? {
-            id: resourceId(subscription().subscriptionId, parResourceGroupName, 'Microsoft.Network/applicationGateways/rewriteRuleSets', parAppGatewayName, 'containerapp-rewrite-rules')
-          } : null
         }
       }
     ]
-    rewriteRuleSets: !empty(parCustomDomain) ? [
-      {
-        name: 'containerapp-rewrite-rules'
-        properties: {
-          rewriteRules: [
-            {
-              name: 'set-forwarded-headers'
-              ruleSequence: 100
-              conditions: []
-              actionSet: {
-                requestHeaderConfigurations: [
-                  {
-                    headerName: 'X-Forwarded-Host'
-                    headerValue: parCustomDomain
-                  }
-                  {
-                    headerName: 'X-Forwarded-Proto'
-                    headerValue: 'https'
-                  }
-                ]
-                responseHeaderConfigurations: []
-              }
-            }
-          ]
-        }
-      }
-    ] : []
   }
 }
 
