@@ -152,6 +152,7 @@ module modAppGateway 'modules/app-gateway.bicep' = {
     parAppGatewayName: parAppGatewayName
     parLocation: parLocation
     parContainerAppFqdn: parContainerAppFqdn
+    parContainerAppEnvDefaultDomain: varContainerAppEnvDefaultDomain
     parCustomDomain: parCustomDomain
     parSpokeKeyVaultName: parSpokeKeyVaultName
     parTrustedRootCertificateSecretName: parTrustedRootCertificateSecretName

@@ -5,6 +5,7 @@ targetScope = 'resourceGroup'
 param parAppGatewayName string
 param parLocation string
 param parContainerAppFqdn string
+param parContainerAppEnvDefaultDomain string
 param parCustomDomain string
 param parSpokeKeyVaultName string
 param parTrustedRootCertificateSecretName string
@@ -116,15 +117,15 @@ module modAppGateway 'br/public:avm/res/network/application-gateway:0.6.0' = {
         name: 'containerapp-health-probe'
         properties: {
           protocol: 'Https'
-          path: '/health'
+          path: '/'
           interval: 300
           timeout: 30
           unhealthyThreshold: 3
-          pickHostNameFromBackendHttpSettings: !empty(parCustomDomain) ? false : true
-          host: !empty(parCustomDomain) ? parCustomDomain : null
+          pickHostNameFromBackendHttpSettings: false
+          host: 'ingress.${parContainerAppEnvDefaultDomain}'
           minServers: 0
           match: {
-            statusCodes: ['200-399']
+            statusCodes: ['200-499']
           }
         }
       }

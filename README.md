@@ -109,7 +109,24 @@ After deployment, configure Open WebUI to call Azure OpenAI through your APIM ga
 | **API Key** | Get from APIM → Subscriptions → Copy primary key |
 | **API Type** | `OpenAI` |
 
-1. Click **Save** and **Verify Connection**
+6. Click **Save** and **Verify Connection**
+
+### Adding Foundry Models Endpoint
+
+To enable model discovery via the Foundry `/models` endpoint:
+
+1. In Open WebUI, go to **Admin Settings** → **Connections**
+2. Edit your APIM connection or add a new one
+3. Use the Foundry API path:
+
+| Field | Value |
+|-------|-------|
+| **Name** | `Azure Foundry Models` |
+| **API Base URL** | `https://apim-open-webui.azure-api.net/foundry` |
+| **API Key** | (Same APIM subscription key) |
+| **API Type** | `OpenAI` |
+
+This endpoint will return all deployed models in your Foundry instance. Open WebUI will automatically discover and list them in the model dropdown.
 
 ### Getting Your APIM Subscription Key
 
@@ -157,11 +174,21 @@ Then add the printed IPs to the Foundry firewall IP rules (or use a private endp
 
 ## Scale to Zero Behaviour
 
-The Container App is configured with `minReplicas: 0` to minimise costs:
+The Container App is configured with `minReplicas: 0` to minimize costs:
 
-- Scales to zero after ~5 minutes of inactivity
+- Scales to zero after ~10-15 minutes of inactivity
 - Cold start time: 10-30+ seconds (container image is ~1GB)
-- Set `minReplicas: 1` in `app.bicep` for always-on behaviour
+- Set `minReplicas: 1` in `app.bicep` for always-on behavior
+
+### Application Gateway Health Probe Workaround
+
+To enable scale-to-zero with Application Gateway, the health probe is configured to check the **Container App Environment ingress** (Envoy) rather than the application itself:
+
+- **Probe Host:** `ingress.{environmentDomain}` (e.g., `ingress.jollyfield-adf491b7.uksouth.azurecontainerapps.io`)
+- **Accepted Status Codes:** `200-499` (ingress returns 403 when no app matches, which is healthy)
+- **Probe Interval:** 300 seconds (5 minutes)
+
+This allows the app to scale to zero while the ingress (which doesn't scale) continues to respond to health probes. See [Azure Container Apps Issue #1090](https://github.com/microsoft/azure-container-apps/issues/1090) for more details.
 
 ## Security Notes
 
