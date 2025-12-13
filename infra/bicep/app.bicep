@@ -2,6 +2,9 @@ targetScope = 'subscription'
 // ms graph extensibility
 extension 'br:mcr.microsoft.com/bicep/extensions/microsoftgraph/v1.0:1.0.0'
 
+// ========== Type Imports ==========
+import { FoundryDeploymentType } from './types.bicep'
+
 // ========== Existing Resources ==========
 // Reference existing APIM to get its managed identity principal ID
 resource resApimExisting 'Microsoft.ApiManagement/service@2023-05-01-preview' existing = if (!empty(parApimName)) {
@@ -9,8 +12,10 @@ resource resApimExisting 'Microsoft.ApiManagement/service@2023-05-01-preview' ex
   name: parApimName
 }
 
-// Parameters
-param parLocation string = 'uksouth'
+// ========== Parameters ==========
+@description('Azure region for resource deployment')
+param parLocation string
+
 param parResourceGroupName string
 param parVirtualNetworkAddressPrefix string
 param parAcaSubnetAddressPrefix string
@@ -20,20 +25,10 @@ param parCustomDomain string
 param parCertificateName string
 param parApimName string
 param parApimAllowedIpAddresses array = []
+
 @description('List of allowed IP addresses for Container App ingress (CIDR format). Leave empty to allow all traffic.')
 param parContainerAppAllowedIpAddresses array = []
-type FoundryDeploymentType = {
-  name: string
-  model: {
-    format: string
-    name: string
-    version: string
-  }
-  sku: {
-    name: string
-    capacity: int
-  }
-}
+
 param parFoundryDeployments FoundryDeploymentType[]
 // Variables
 var varOpenWebUiShare = 'open-webui-share'
@@ -45,7 +40,7 @@ var varIpSecurityRestrictions = [for ip in parContainerAppAllowedIpAddresses: {
   action: 'Allow'
 }]
 
-resource entraIdApp 'Microsoft.Graph/applications@v1.0' = {
+resource resEntraIdApp 'Microsoft.Graph/applications@v1.0' = {
   displayName: varAppRegistrationName
   uniqueName: varAppRegistrationName
   signInAudience: 'AzureADMyOrg'
@@ -137,8 +132,8 @@ resource entraIdApp 'Microsoft.Graph/applications@v1.0' = {
   ]
 }
 
-resource entraIdServicePrincipal 'Microsoft.Graph/servicePrincipals@v1.0' = {
-  appId: entraIdApp.appId
+resource resEntraIdServicePrincipal 'Microsoft.Graph/servicePrincipals@v1.0' = {
+  appId: resEntraIdApp.appId
 
 }
 
@@ -376,7 +371,7 @@ module modContainerApp 'br/public:avm/res/app/container-app:0.19.0' = {
           }
           {
             name: 'OAUTH_CLIENT_ID'
-            value: entraIdApp.appId
+            value: resEntraIdApp.appId
           }
           {
             name: 'OAUTH_CODE_CHALLENGE_METHOD'
@@ -528,9 +523,9 @@ module modContainerApp 'br/public:avm/res/app/container-app:0.19.0' = {
   dependsOn: [modResourceGroup]
 }
 
-module modStorageRbac 'br/public:avm/ptn/authorization/resource-role-assignment:0.1.2' = {
+module modContainerAppKeyVaultRbac 'br/public:avm/ptn/authorization/resource-role-assignment:0.1.2' = {
   scope: resourceGroup(parResourceGroupName)
-  params:{
+  params: {
     principalId: modContainerApp.outputs.systemAssignedMIPrincipalId!
     roleName: 'Key Vault Secrets User'
     resourceId: modKeyVault.outputs.resourceId
@@ -591,4 +586,4 @@ output outContainerAppEnvDefaultDomain string = modContainerAppEnv.outputs.defau
 output outVirtualNetworkName string = modVirtualNetwork.outputs.name
 output outVirtualNetworkResourceId string = modVirtualNetwork.outputs.resourceId
 output outFoundryEndpoint string = modFoundry.outputs.endpoint
-output outOpenWebUIAppId string = entraIdApp.appId
+output outOpenWebUIAppId string = resEntraIdApp.appId

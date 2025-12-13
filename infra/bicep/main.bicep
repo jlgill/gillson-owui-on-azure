@@ -1,4 +1,5 @@
 targetScope = 'subscription'
+
 // ========== Parameters ==========
 param parLocation string
 param parResourceGroupName string
@@ -27,12 +28,27 @@ param parOpenWebUIAppId string
 param parTrustedRootCertificateSecretName string
 param parSslCertificateSecretName string
 param parFoundryEndpoint string
+
 // ========== Variables ==========
 var varOpenWebUi = 'open-webui'
 var varNsgRules = loadJsonContent('nsg-rules.json')
 var varContainerAppEnvDefaultDomain = !empty(parContainerAppFqdn) ? join(skip(split(parContainerAppFqdn, '.'), 1), '.') : ''
 var varContainerAppName = !empty(parContainerAppFqdn) ? split(parContainerAppFqdn, '.')[0] : ''
 var varTrustedRootCertificateBase64 = loadTextContent('cloudflare-origin-ca.cer')
+
+// Public IP configurations for loop deployment
+var varPublicIpConfigs = [
+  {
+    key: 'appgw'
+    name: '${parAppGatewayName}-pip'
+    dnsLabel: null
+  }
+  {
+    key: 'apim'
+    name: '${parApimName}-pip'
+    dnsLabel: '${parApimName}-${uniqueString(subscription().subscriptionId, parResourceGroupName)}'
+  }
+]
 
 // ========== Resource Group =========
 module modResourceGroup 'br/public:avm/res/resources/resource-group:0.4.2' = {
@@ -96,36 +112,22 @@ module modAppGatewaySpokeKeyVaultRbac 'br/public:avm/ptn/authorization/resource-
   }
 }
 
-// ========== Application Gateway Public IP ==========
-module modAppGatewayPublicIp 'br/public:avm/res/network/public-ip-address:0.8.0' = {
+// ========== Public IP Addresses ==========
+module modPublicIps 'br/public:avm/res/network/public-ip-address:0.8.0' = [for config in varPublicIpConfigs: {
   scope: resourceGroup(parResourceGroupName)
+  name: 'pip-${config.key}'
   params: {
-    name: '${parAppGatewayName}-pip'
+    name: config.name
     location: parLocation
     skuName: 'Standard'
     publicIPAllocationMethod: 'Static'
     zones: []
+    dnsSettings: config.dnsLabel != null ? {
+      domainNameLabel: config.dnsLabel!
+    } : null
   }
   dependsOn: [modResourceGroup]
-}
-
-// ========== APIM Public IP ==========
-module modApimPublicIp 'br/public:avm/res/network/public-ip-address:0.8.0' = {
-  scope: resourceGroup(parResourceGroupName)
-  params: {
-    name: '${parApimName}-pip'
-    location: parLocation
-    zones: []
-    skuName: 'Standard'
-    publicIPAllocationMethod: 'Static'
-    dnsSettings: {
-      domainNameLabel: '${parApimName}-${uniqueString(subscription().subscriptionId, parResourceGroupName)}'
-    }
-  }
-  dependsOn: [
-    modResourceGroup
-  ]
-}
+}]
 
 // ========== Redis Cache for AI Gateway ==========
 module modRedisCache 'modules/cache.bicep' = {
@@ -163,7 +165,7 @@ module modAppGateway 'modules/app-gateway.bicep' = {
     parTrustedRootCertificateSecretName: parTrustedRootCertificateSecretName
     parSslCertificateSecretName: parSslCertificateSecretName
     parAppGatewaySubnetId: modNetworking.outputs.appGatewaySubnetResourceId
-    parPublicIpResourceId: modAppGatewayPublicIp.outputs.resourceId
+    parPublicIpResourceId: modPublicIps[0].outputs.resourceId
     parUserAssignedIdentityResourceId: modSecurity.outputs.userAssignedIdentityResourceId
     parHubKeyVaultUri: modSecurity.outputs.hubKeyVaultUri
     parResourceGroupName: parResourceGroupName
@@ -189,7 +191,7 @@ module modApim 'modules/apim.bicep' = {
     parAppInsightsInstrumentationKey: modMonitoring.outputs.appInsightsInstrumentationKey
     parLogAnalyticsWorkspaceResourceId: modMonitoring.outputs.logAnalyticsWorkspaceResourceId
     parApimSubnetResourceId: modNetworking.outputs.apimSubnetResourceId
-    parApimPublicIpResourceId: modApimPublicIp.outputs.resourceId
+    parApimPublicIpResourceId: modPublicIps[1].outputs.resourceId
     parRedisCacheConnectionString: '${modRedisCache.outputs.hostName}:${modRedisCache.outputs.sslPort},password=${resRedisEnterprise.listKeys().primaryKey},ssl=True,abortConnect=False'
   }
   dependsOn: [
@@ -229,8 +231,8 @@ output outApimGatewayUrl string = modApim.outputs.gatewayUrl
 output outApimSystemAssignedPrincipalId string = modApim.outputs.systemAssignedMIPrincipalId
 output outAppInsightsConnectionString string = modMonitoring.outputs.appInsightsConnectionString
 output outAppInsightsResourceId string = modMonitoring.outputs.appInsightsResourceId
-output outAppGatewayPublicIp string = modAppGatewayPublicIp.outputs.resourceId
-output outApimPublicIp string = modApimPublicIp.outputs.ipAddress
+output outAppGatewayPublicIp string = modPublicIps[0].outputs.resourceId
+output outApimPublicIp string = modPublicIps[1].outputs.ipAddress
 output outVirtualNetworkResourceId string = modNetworking.outputs.virtualNetworkResourceId
 output outVirtualNetworkName string = modNetworking.outputs.virtualNetworkName
 output outContainerAppFqdn string = parContainerAppFqdn

@@ -82,6 +82,7 @@ module modVirtualNetwork 'br/public:avm/res/network/virtual-network:0.7.1' = {
         allowGatewayTransit: false
         allowVirtualNetworkAccess: true
         useRemoteGateways: false
+        doNotVerifyRemoteGateways: true
       }
     ] : []
   }
@@ -134,7 +135,10 @@ module modApimPrivateDnsZone 'br/public:avm/res/network/private-dns-zone:0.8.0' 
 output virtualNetworkResourceId string = modVirtualNetwork.outputs.resourceId
 output virtualNetworkName string = modVirtualNetwork.outputs.name
 output subnetResourceIds array = modVirtualNetwork.outputs.subnetResourceIds
-output apimSubnetResourceId string = modVirtualNetwork.outputs.subnetResourceIds[0]
-output appGatewaySubnetResourceId string = modVirtualNetwork.outputs.subnetResourceIds[1]
-output redisCacheSubnetResourceId string = modVirtualNetwork.outputs.subnetResourceIds[2]
+
+// Subnet outputs using filter for robustness (order-independent)
+output apimSubnetResourceId string = filter(modVirtualNetwork.outputs.subnetResourceIds, id => contains(id, '/subnets/apim-subnet'))[0]
+output appGatewaySubnetResourceId string = filter(modVirtualNetwork.outputs.subnetResourceIds, id => contains(id, '/subnets/appgw-subnet'))[0]
+output redisCacheSubnetResourceId string = filter(modVirtualNetwork.outputs.subnetResourceIds, id => contains(id, '/subnets/redis-subnet'))[0]
+
 output apimPrivateDnsZoneName string = modApimPrivateDnsZone.outputs.name
