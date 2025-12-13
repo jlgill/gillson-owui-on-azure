@@ -1,4 +1,6 @@
 targetScope = 'subscription'
+// ms graph extensibility
+extension 'br:mcr.microsoft.com/bicep/extensions/microsoftgraph/v1.0:1.0.0'
 
 // ========== Parameters ==========
 param parLocation string
@@ -24,10 +26,15 @@ param parContainerAppFqdn string
 param parContainerAppStaticIp string
 param parCustomDomain string
 param parSpokeKeyVaultName string
-param parOpenWebUIAppId string
 param parTrustedRootCertificateSecretName string
 param parSslCertificateSecretName string
 param parFoundryEndpoint string
+
+// ========== Existing Resources ==========
+// Reference existing Entra ID app registration created by app.bicep
+resource resEntraIdAppExisting 'Microsoft.Graph/applications@v1.0' existing = {
+  uniqueName: 'app-open-webui'
+}
 
 // ========== Variables ==========
 var varOpenWebUi = 'open-webui'
@@ -185,7 +192,7 @@ module modApim 'modules/apim.bicep' = {
     parPublisherEmail: parApimPublisherEmail
     parPublisherName: parApimPublisherName
     parFoundryEndpoint: parFoundryEndpoint
-    parOpenWebUIAppId: parOpenWebUIAppId
+    parOpenWebUIAppId: resEntraIdAppExisting.appId
     parAppInsightsName: modMonitoring.outputs.appInsightsName
     parAppInsightsResourceId: modMonitoring.outputs.appInsightsResourceId
     parAppInsightsInstrumentationKey: modMonitoring.outputs.appInsightsInstrumentationKey
