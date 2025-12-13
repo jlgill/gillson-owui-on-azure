@@ -46,6 +46,11 @@ module modRedisCache 'br/public:avm/res/cache/redis-enterprise:0.5.0' = {
       clusteringPolicy: 'NoCluster'
       evictionPolicy: 'AllKeysLRU'
       port: 10000
+      modules: [
+        {
+          name: 'RediSearch'
+        }
+      ]
       accessKeysAuthentication: 'Enabled' // APIM only supports key cache auth atm :(
     }
     privateEndpoints: [

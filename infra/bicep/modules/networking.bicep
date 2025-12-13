@@ -8,7 +8,6 @@ param parVirtualNetworkName string
 param parVirtualNetworkAddressPrefix string
 param parApimSubnetAddressPrefix string
 param parAppGatewaySubnetAddressPrefix string
-param parRedisCacheSubnetAddressPrefix string
 param parSpokeResourceGroupName string
 param parSpokeVirtualNetworkName string
 param parContainerAppEnvDefaultDomain string
@@ -68,11 +67,6 @@ module modVirtualNetwork 'br/public:avm/res/network/virtual-network:0.7.1' = {
       {
         name: 'appgw-subnet'
         addressPrefix: parAppGatewaySubnetAddressPrefix
-      }
-      {
-        name: 'redis-subnet'
-        addressPrefix: parRedisCacheSubnetAddressPrefix
-        privateEndpointNetworkPolicies: 'Disabled'
       }
     ]
     peerings: !empty(parSpokeVirtualNetworkName) ? [
@@ -139,6 +133,5 @@ output subnetResourceIds array = modVirtualNetwork.outputs.subnetResourceIds
 // Subnet outputs using filter for robustness (order-independent)
 output apimSubnetResourceId string = filter(modVirtualNetwork.outputs.subnetResourceIds, id => contains(id, '/subnets/apim-subnet'))[0]
 output appGatewaySubnetResourceId string = filter(modVirtualNetwork.outputs.subnetResourceIds, id => contains(id, '/subnets/appgw-subnet'))[0]
-output redisCacheSubnetResourceId string = filter(modVirtualNetwork.outputs.subnetResourceIds, id => contains(id, '/subnets/redis-subnet'))[0]
 
 output apimPrivateDnsZoneName string = modApimPrivateDnsZone.outputs.name

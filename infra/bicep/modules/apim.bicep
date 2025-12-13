@@ -15,7 +15,6 @@ param parAppInsightsInstrumentationKey string
 param parLogAnalyticsWorkspaceResourceId string
 param parApimSubnetResourceId string
 param parApimPublicIpResourceId string
-param parRedisCacheConnectionString string = ''
 
 // Load policy files
 var varOpenAIPolicyXml = loadTextContent('../policies/openai-api.xml')
@@ -119,14 +118,6 @@ module modApim 'br/public:avm/res/api-management/service:0.12.0' = {
         displayName: 'openwebui-app-id'
         value: parOpenWebUIAppId
         secret: false
-      }
-    ] : []
-    caches: !empty(parRedisCacheConnectionString) ? [
-      {
-        name: 'default'
-        description: 'External Redis cache for AI Gateway semantic caching'
-        connectionString: parRedisCacheConnectionString
-        useFromLocation: 'uksouth'
       }
     ] : []
   }

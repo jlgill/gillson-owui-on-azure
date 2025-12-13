@@ -13,10 +13,8 @@ param parVirtualNetworkName string
 param parVirtualNetworkAddressPrefix string
 param parApimSubnetAddressPrefix string
 param parAppGatewaySubnetAddressPrefix string
-param parRedisCacheSubnetAddressPrefix string
 param parApimSku string
 param parAppGatewaySku string
-param parRedisCacheSku string
 param parSpokeResourceGroupName string
 param parSpokeVirtualNetworkName string
 @validate(
@@ -75,7 +73,6 @@ module modNetworking 'modules/networking.bicep' = {
     parVirtualNetworkAddressPrefix: parVirtualNetworkAddressPrefix
     parApimSubnetAddressPrefix: parApimSubnetAddressPrefix
     parAppGatewaySubnetAddressPrefix: parAppGatewaySubnetAddressPrefix
-    parRedisCacheSubnetAddressPrefix: parRedisCacheSubnetAddressPrefix
     parSpokeResourceGroupName: parSpokeResourceGroupName
     parSpokeVirtualNetworkName: parSpokeVirtualNetworkName
     parContainerAppEnvDefaultDomain: varContainerAppEnvDefaultDomain
@@ -136,29 +133,6 @@ module modPublicIps 'br/public:avm/res/network/public-ip-address:0.8.0' = [for c
   dependsOn: [modResourceGroup]
 }]
 
-// ========== Redis Cache for AI Gateway ==========
-module modRedisCache 'modules/cache.bicep' = {
-  scope: resourceGroup(parResourceGroupName)
-  params: {
-    parCacheName: 'redis-${parApimName}'
-    parLocation: parLocation
-    parSkuName: parRedisCacheSku
-    parSubnetResourceId: modNetworking.outputs.redisCacheSubnetResourceId
-    parHubVnetResourceId: modNetworking.outputs.virtualNetworkResourceId
-    parSpokeVnetResourceId: resourceId(subscription().subscriptionId, parSpokeResourceGroupName, 'Microsoft.Network/virtualNetworks', parSpokeVirtualNetworkName)
-  }
-  dependsOn: [
-    modResourceGroup
-  ]
-}
-
-// Reference deployed Redis Enterprise database to get keys
-resource resRedisEnterprise 'Microsoft.Cache/redisEnterprise/databases@2024-10-01' existing = {
-  scope: resourceGroup(parResourceGroupName)
-  name: 'redis-${parApimName}/default'
-  dependsOn: [modRedisCache]
-}
-
 // ========== Application Gateway ==========
 module modAppGateway 'modules/app-gateway.bicep' = {
   scope: resourceGroup(parResourceGroupName)
@@ -199,7 +173,6 @@ module modApim 'modules/apim.bicep' = {
     parLogAnalyticsWorkspaceResourceId: modMonitoring.outputs.logAnalyticsWorkspaceResourceId
     parApimSubnetResourceId: modNetworking.outputs.apimSubnetResourceId
     parApimPublicIpResourceId: modPublicIps[1].outputs.resourceId
-    parRedisCacheConnectionString: '${modRedisCache.outputs.hostName}:${modRedisCache.outputs.sslPort},password=${resRedisEnterprise.listKeys().primaryKey},ssl=True,abortConnect=False'
   }
   dependsOn: [
     modResourceGroup
