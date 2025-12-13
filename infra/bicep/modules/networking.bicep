@@ -2,6 +2,7 @@
 targetScope = 'resourceGroup'
 
 // Parameters
+param parNamePrefix string
 param parLocation string
 param parVirtualNetworkName string
 param parVirtualNetworkAddressPrefix string
@@ -18,9 +19,26 @@ param parNsgRules array
 // NSG for APIM Subnet
 module modNsgApim 'br/public:avm/res/network/network-security-group:0.5.2' = {
   params: {
-    name: 'apim-nsg'
+    name: '${parNamePrefix}-apim-nsg'
     location: parLocation
     securityRules: parNsgRules
+  }
+}
+
+// Route Table for APIM Subnet (prevents forced tunneling)
+module modApimRouteTable 'br/public:avm/res/network/route-table:0.5.0' = {
+  params: {
+    name: '${parNamePrefix}-apim-rt'
+    location: parLocation
+    routes: [
+      {
+        name: 'apim-management-endpoint'
+        properties: {
+          addressPrefix: 'ApiManagement'
+          nextHopType: 'Internet'
+        }
+      }
+    ]
   }
 }
 
@@ -37,6 +55,15 @@ module modVirtualNetwork 'br/public:avm/res/network/virtual-network:0.7.1' = {
         name: 'apim-subnet'
         addressPrefix: parApimSubnetAddressPrefix
         networkSecurityGroupResourceId: modNsgApim.outputs.resourceId
+        routeTableResourceId: modApimRouteTable.outputs.resourceId
+        serviceEndpoints: [
+          'Microsoft.Storage'
+          'Microsoft.Sql'
+          'Microsoft.EventHub'
+          'Microsoft.KeyVault'
+          'Microsoft.ServiceBus'
+          'Microsoft.AzureActiveDirectory'
+        ]
       }
       {
         name: 'appgw-subnet'

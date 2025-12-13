@@ -55,18 +55,6 @@ module modApim 'br/public:avm/res/api-management/service:0.12.0' = {
         subscriptionKeyParameterNames: {
           header: 'api-key'
         }
-        diagnostics: [
-          {
-            name: 'applicationinsights'
-            loggerName: parAppInsightsName
-            alwaysLog: 'allErrors'
-            logClientIp: true
-            httpCorrelationProtocol: 'W3C'
-            verbosity: 'information'
-            samplingPercentage: 100
-            metrics: true
-          }
-        ]
         policies: [
           {
             format: 'rawxml'
@@ -157,6 +145,9 @@ module modApimMetricsPublisherRbac 'br/public:avm/ptn/authorization/resource-rol
 // Configure LLM logging for the openai API diagnostic
 resource resOpenAIDiagnosticLLMLogging 'Microsoft.ApiManagement/service/apis/diagnostics@2024-06-01-preview' = {
   name: '${parApimName}/openai/applicationinsights'
+  dependsOn: [
+    modApim
+  ]
   properties: {
     alwaysLog: 'allErrors'
     logClientIp: true
@@ -180,7 +171,6 @@ resource resOpenAIDiagnosticLLMLogging 'Microsoft.ApiManagement/service/apis/dia
       }
     }
   }
-  dependsOn: [modApim]
 }
 
 // Outputs

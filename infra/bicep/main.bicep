@@ -46,6 +46,7 @@ module modResourceGroup 'br/public:avm/res/resources/resource-group:0.4.2' = {
 module modNetworking 'modules/networking.bicep' = {
   scope: resourceGroup(parResourceGroupName)
   params: {
+    parNamePrefix: varOpenWebUi
     parLocation: parLocation
     parVirtualNetworkName: parVirtualNetworkName
     parVirtualNetworkAddressPrefix: parVirtualNetworkAddressPrefix
@@ -112,13 +113,13 @@ module modAppGatewayPublicIp 'br/public:avm/res/network/public-ip-address:0.8.0'
 module modApimPublicIp 'br/public:avm/res/network/public-ip-address:0.8.0' = {
   scope: resourceGroup(parResourceGroupName)
   params: {
-    name: 'apim-${parApimName}-pip'
+    name: '${parApimName}-pip'
     location: parLocation
     zones: []
     skuName: 'Standard'
     publicIPAllocationMethod: 'Static'
     dnsSettings: {
-      domainNameLabel: 'apim-${parApimName}-${uniqueString(subscription().subscriptionId, parResourceGroupName)}'
+      domainNameLabel: '${parApimName}-${uniqueString(subscription().subscriptionId, parResourceGroupName)}'
     }
   }
   dependsOn: [
@@ -142,10 +143,10 @@ module modRedisCache 'modules/cache.bicep' = {
   ]
 }
 
-// Reference deployed Redis cache to get keys
-resource resRedisCache 'Microsoft.Cache/redis@2023-08-01' existing = {
+// Reference deployed Redis Enterprise database to get keys
+resource resRedisEnterprise 'Microsoft.Cache/redisEnterprise/databases@2024-10-01' existing = {
   scope: resourceGroup(parResourceGroupName)
-  name: 'redis-${parApimName}'
+  name: 'redis-${parApimName}/default'
   dependsOn: [modRedisCache]
 }
 
@@ -189,7 +190,7 @@ module modApim 'modules/apim.bicep' = {
     parLogAnalyticsWorkspaceResourceId: modMonitoring.outputs.logAnalyticsWorkspaceResourceId
     parApimSubnetResourceId: modNetworking.outputs.apimSubnetResourceId
     parApimPublicIpResourceId: modApimPublicIp.outputs.resourceId
-    parRedisCacheConnectionString: '${modRedisCache.outputs.hostName}:${modRedisCache.outputs.sslPort},password=${resRedisCache.listKeys().primaryKey},ssl=True,abortConnect=False'
+    parRedisCacheConnectionString: '${modRedisCache.outputs.hostName}:${modRedisCache.outputs.sslPort},password=${resRedisEnterprise.listKeys().primaryKey},ssl=True,abortConnect=False'
   }
   dependsOn: [
     modResourceGroup

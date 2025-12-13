@@ -62,7 +62,32 @@ az deployment sub create \
 
 ### 3. Import API Specifications
 
-### 3. Configure Cloudflare DNS
+After APIM deployment completes, import the OpenAPI spec to populate all API operations:
+
+```bash
+az apim api import \
+  --resource-group rg-lb-core \
+  --service-name apim-open-webui \
+  --api-id openai \
+  --path "openai/v1" \
+  --specification-format OpenApiJson \
+  --specification-path infra/bicep/openapi/openai.openapi.json \
+  --display-name "Azure OpenAI v1 API" \
+  --protocols https \
+  --subscription-required true
+```
+
+**Verify the import:**
+```bash
+az apim api operation list \
+  --resource-group rg-lb-core \
+  --service-name apim-open-webui \
+  --api-id openai \
+  --query "[].{Name:name, Method:method, UrlTemplate:urlTemplate}" \
+  -o table
+```
+
+### 4. Configure Cloudflare DNS
 
 1. Add an A record pointing your custom domain to the Application Gateway public IP
 2. Enable **Proxy (orange cloud)**

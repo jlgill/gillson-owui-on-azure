@@ -10,7 +10,7 @@ param parCertificateName = 'cloudflare-origin-cert'
 param parApimPrincipalId = 'd5d3423b-9834-4714-be94-c7530d92fd40'
 param parApimGatewayUrl = 'https://apim-open-webui.azure-api.net'
 param parApimAllowedIpAddresses = [
-	'20.162.197.89' // APIM VIP - New Foundry doesn't support end to end private networking yet.
+	'172.167.219.126' // APIM VIP - New Foundry doesn't support end to end private networking yet.
 ]
 
 param parContainerAppAllowedIpAddresses = [
