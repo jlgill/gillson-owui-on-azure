@@ -22,9 +22,9 @@
     <!-- AI Gateway: Token rate limiting with prompt estimation -->
     <llm-token-limit tokens-per-minute="100000" estimate-prompt-tokens="true" counter-key="@(context.Subscription.Id)" tokens-consumed-header-name="consumed-tokens" remaining-tokens-header-name="remaining-tokens" />
     <!-- AI Gateway: Enable semantic caching for cost optimization -->
-    <llm-semantic-cache-lookup score-threshold="0.95" embeddings-backend-id="foundry-backend" embeddings-backend-auth="system-assigned">
-      <vary-by>@(context.Request.Headers.GetValueOrDefault("Authorization",""))</vary-by>
-    </llm-semantic-cache-lookup>
+    <azure-openai-semantic-cache-lookup score-threshold="0.95" embeddings-backend-id="foundry-backend" embeddings-backend-auth="system-assigned" ignore-system-messages="true" max-message-count="10">
+      <vary-by>@(context.Subscription.Id)</vary-by>
+    </azure-openai-semantic-cache-lookup>
     <set-backend-service backend-id="foundry-backend" />
     <authentication-managed-identity resource="https://cognitiveservices.azure.com" />
   </inbound>
@@ -34,7 +34,7 @@
   <outbound>
     <base />
     <!-- AI Gateway: Store successful responses in semantic cache -->
-    <llm-semantic-cache-store duration="3600" />
+    <azure-openai-semantic-cache-store duration="3600" />
   </outbound>
   <on-error>
     <base />
