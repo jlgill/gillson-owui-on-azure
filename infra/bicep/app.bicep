@@ -570,7 +570,7 @@ module modFoundry 'br/public:avm/res/cognitive-services/account:0.14.0' = {
       ],
       !empty(parApimName) ? [
         {
-          principalId: resApimExisting.identity.principalId
+          principalId: resApimExisting!.identity.principalId!
           principalType: 'ServicePrincipal'
           roleDefinitionIdOrName: '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
         }
