@@ -3,6 +3,19 @@
 // Import using: import { TypeName } from './types.bicep'
 
 @export()
+@description('Standard resource tags for demo environment')
+type TagsType = {
+  @description('Application or workload name')
+  Application: string
+  @description('Deployment environment')
+  Environment: 'Demo' | 'Dev' | 'Prod'
+  @description('Resource owner or contact')
+  Owner: string
+  @description('Additional custom tags')
+  *: string
+}
+
+@export()
 @description('Configuration for Azure AI Foundry model deployments')
 type FoundryDeploymentType = {
   @description('Deployment name (e.g., gpt-4o)')

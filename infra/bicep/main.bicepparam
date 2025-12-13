@@ -21,3 +21,8 @@ param parSpokeKeyVaultName = 'open-webui-app-kv'
 param parTrustedRootCertificateSecretName = 'cloudflare-origin-ca'
 param parSslCertificateSecretName = 'cloudflare-origin-cert'
 param parFoundryEndpoint = 'https://openwebuiappfoundry.services.ai.azure.com/'
+param parTags = {
+  Application: 'Open WebUI'
+  Environment: 'Demo'
+  Owner: 'Dan Rios'
+}

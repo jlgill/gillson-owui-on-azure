@@ -2,6 +2,9 @@ targetScope = 'subscription'
 // ms graph extensibility
 extension 'br:mcr.microsoft.com/bicep/extensions/microsoftgraph/v1.0:1.0.0'
 
+// ========== Type Imports ==========
+import { TagsType } from './types.bicep'
+
 // ========== Parameters ==========
 param parLocation string
 param parResourceGroupName string
@@ -27,6 +30,7 @@ param parSpokeKeyVaultName string
 param parTrustedRootCertificateSecretName string
 param parSslCertificateSecretName string
 param parFoundryEndpoint string
+param parTags TagsType
 
 // ========== Existing Resources ==========
 // Reference existing Entra ID app registration created by app.bicep
@@ -60,6 +64,7 @@ module modResourceGroup 'br/public:avm/res/resources/resource-group:0.4.2' = {
   params: {
     name: parResourceGroupName
     location: parLocation
+    tags: parTags
   }
 }
 

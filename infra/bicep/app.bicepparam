@@ -18,6 +18,12 @@ param parContainerAppAllowedIpAddresses = [
   '10.0.0.64/26' // App Gateway subnet
 ]
 
+param parTags = {
+  Application: 'Open WebUI'
+  Environment: 'Demo'
+  Owner: 'Dan Rios'
+}
+
 param parFoundryDeployments = [
   {
     name: 'gpt-4o'

@@ -3,7 +3,7 @@ targetScope = 'subscription'
 extension 'br:mcr.microsoft.com/bicep/extensions/microsoftgraph/v1.0:1.0.0'
 
 // ========== Type Imports ==========
-import { FoundryDeploymentType } from './types.bicep'
+import { FoundryDeploymentType, TagsType } from './types.bicep'
 
 // ========== Existing Resources ==========
 // Reference existing APIM to get its managed identity principal ID
@@ -30,6 +30,7 @@ param parApimAllowedIpAddresses array = []
 param parContainerAppAllowedIpAddresses array = []
 
 param parFoundryDeployments FoundryDeploymentType[]
+param parTags TagsType
 // Variables
 var varOpenWebUiShare = 'open-webui-share'
 var varOpenWebUiApp = 'open-webui-app'
@@ -141,6 +142,7 @@ module modResourceGroup 'br/public:avm/res/resources/resource-group:0.4.2' = {
   params: {
     name: parResourceGroupName
     location: parLocation
+    tags: parTags
   }
 }
 
