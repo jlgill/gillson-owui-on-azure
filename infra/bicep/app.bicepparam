@@ -12,18 +12,19 @@ param parApimName = 'apim-open-webui'
 param parApimAllowedIpAddresses = [
   '172.167.219.126' // APIM VIP - New Foundry doesn't support end to end private networking yet.
 ]
-
 param parContainerAppAllowedIpAddresses = [
   '188.74.98.58/32' // My IP for testing
   '10.0.0.64/26' // App Gateway subnet
 ]
-
 param parTags = {
   Application: 'Open WebUI'
   Environment: 'Demo'
   Owner: 'Dan Rios'
 }
-
+param parContainerAppScaleSettings = {
+  minReplicas: 0 // App Gateway Probe means it likely will never scale to 0 btw
+  maxReplicas: 1
+}
 param parFoundryDeployments = [
   {
     name: 'gpt-4o'

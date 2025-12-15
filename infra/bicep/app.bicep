@@ -19,6 +19,7 @@ param parApimAllowedIpAddresses array = []
 @secure()
 param parCertificatePfxBase64 string = ''
 param parContainerAppAllowedIpAddresses array = []
+param parContainerAppScaleSettings object
 param parFoundryDeployments FoundryDeploymentType[]
 param parTags TagsType
 // Variables
@@ -533,10 +534,7 @@ module modContainerApp 'br/public:avm/res/app/container-app:0.19.0' = {
         mountOptions: 'nobrl,noperm,mfsymlinks,cache=strict'
       }
     ]
-    scaleSettings: {
-      maxReplicas: 1
-      minReplicas: 0
-    }
+    scaleSettings: parContainerAppScaleSettings
     ingressAllowInsecure: false
     environmentResourceId: modContainerAppEnv.outputs.resourceId
     location: parLocation
