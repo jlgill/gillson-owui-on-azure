@@ -1,12 +1,11 @@
-# Azure Open WebUI Quickstart
+# Open WebUI on Azure - Production Grade Quickstart
 
 Deploy [Open WebUI](https://github.com/open-webui/open-webui) on Azure Container Apps with Entra ID authentication, Microsoft (Azure) Foundry integration, and Application Gateway.
 
 ## Architecture
 
-```markdown
-![Azure Open WebUI architecture](docs/architecture.svg)
-```
+![Azure Open WebUI architecture](docs/architecture.drawio.png)
+
 
 ## Features
 
