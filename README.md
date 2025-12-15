@@ -19,14 +19,14 @@ Deploy [Open WebUI](https://github.com/open-webui/open-webui) on Azure Container
 
 > [!NOTE]
 > *Azure Container Apps still [requires Storage Account Access Keys for Azure File SMB mount?](https://learn.microsoft.com/en-us/azure/container-apps/storage-mounts-azure-files?tabs=bash#set-up-a-storage-account) :(
-> **At the time of writing the 'New' Foundry account does not support BYOD/Fully private networking yet. It has been secured via ACL in this demo.
+> **At the time of writing the 'New' Foundry account does not support BYOD/Fully private networking yet. It has been secured via ACL for inbound networking.
 
 ## Prerequisites
 
-- Azure subscription(s) access with Azure CLI and Bicep installed
+- Azure subscription(s) Owner access with Azure CLI and Bicep installed
 - Custom domain with DNS provider (Cloudflare used in examples)
 - SSL certificate (Cloudflare Origin Certificate for Full strict SSL mode and custom domain on ACA env)
-- Application Administrator (Entra role)
+- Application Developer Role (Entra)
 
 ## Deployment
 
