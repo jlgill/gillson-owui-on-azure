@@ -355,6 +355,7 @@ module modContainerApp 'br/public:avm/res/app/container-app:0.19.0' = {
           memory: '1Gi'
         }
         env: [
+          // see https://docs.openwebui.com/getting-started/env-configuration/
           {
             name: 'WEBUI_URL'
             value: 'https://${parCustomDomain}'
