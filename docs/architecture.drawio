@@ -302,6 +302,9 @@
                 <mxCell id="30" value="" style="image;aspect=fixed;html=1;points=[];align=center;fontSize=12;image=img/lib/azure2/networking/Virtual_Networks.svg;" vertex="1" parent="1">
                     <mxGeometry x="646" y="310" width="30" height="17.91" as="geometry"/>
                 </mxCell>
+                <mxCell id="31" value="" style="image;aspect=fixed;html=1;points=[];align=center;fontSize=12;image=img/lib/azure2/other/Grafana.svg;" vertex="1" parent="1">
+                    <mxGeometry x="1170" y="435" width="68" height="52.800000000000004" as="geometry"/>
+                </mxCell>
             </root>
         </mxGraphModel>
     </diagram>

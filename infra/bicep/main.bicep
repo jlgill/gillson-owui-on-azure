@@ -3,7 +3,7 @@ targetScope = 'subscription'
 extension 'br:mcr.microsoft.com/bicep/extensions/microsoftgraph/v1.0:1.0.0'
 
 // ========== Type Imports ==========
-import { TagsType } from './types.bicep'
+import { TagsType } from './shared/types.bicep'
 
 // ========== Parameters ==========
 param parLocation string
@@ -40,10 +40,10 @@ resource resEntraIdAppExisting 'Microsoft.Graph/applications@v1.0' existing = {
 
 // ========== Variables ==========
 var varOpenWebUi = 'open-webui'
-var varNsgRules = loadJsonContent('nsg-rules.json')
+var varNsgRules = loadJsonContent('./shared/nsg-rules.json')
 var varContainerAppEnvDefaultDomain = !empty(parContainerAppFqdn) ? join(skip(split(parContainerAppFqdn, '.'), 1), '.') : ''
 var varContainerAppName = !empty(parContainerAppFqdn) ? split(parContainerAppFqdn, '.')[0] : ''
-var varTrustedRootCertificateBase64 = loadTextContent('cloudflare-origin-ca.cer')
+var varTrustedRootCertificateBase64 = loadTextContent('./cert/cloudflare-origin-ca.cer')
 
 // Public IP configurations for loop deployment
 var varPublicIpConfigs = [

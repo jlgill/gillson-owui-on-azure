@@ -3,7 +3,7 @@ targetScope = 'subscription'
 extension 'br:mcr.microsoft.com/bicep/extensions/microsoftgraph/v1.0:1.0.0'
 
 // ========== Type Imports ==========
-import { FoundryDeploymentType, TagsType } from './types.bicep'
+import { FoundryDeploymentType, TagsType } from './shared/types.bicep'
 
 // ========== Existing Resources ==========
 // Reference existing APIM to get its managed identity principal ID

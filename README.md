@@ -18,11 +18,13 @@ User → Cloudflare (DNS/SSL) → Application Gateway → Container App → Open
 - **Microsoft Foundry** with multiple models (GPT, Grok, Mistral, Llama, DeepSeek) using Managed Identity
 - **Application Gateway** with custom domain and SSL termination
 - **API Management** Delegate API keys per team/user(s) with token tracking, usages, Entra policy validation
-- **No secrets!** Managed Identity + OIDC throughout
+- **No secrets!** Managed Identity + OIDC throughout*
 - **Infrastructure as Code** using Bicep with Azure Verified Modules
-- **Secure by default** using internal ingresses and private endpoints*
+- **Secure by default** using internal ingresses and private endpoints**
 
-> Note: *At the time of writing the 'New' Foundry account does not support BYOD/Fully private networking yet. It has been secured via ACL in this demo.
+> [!NOTE]
+> *Azure Container Apps still [requires Storage Account Access Keys for Azure File SMB mount?](https://learn.microsoft.com/en-us/azure/container-apps/storage-mounts-azure-files?tabs=bash#set-up-a-storage-account) :(
+> **At the time of writing the 'New' Foundry account does not support BYOD/Fully private networking yet. It has been secured via ACL in this demo.
 
 ## Prerequisites
 
@@ -35,6 +37,7 @@ User → Cloudflare (DNS/SSL) → Application Gateway → Container App → Open
 
 ### 1. Deploy 'Hub' Infrastructure (APIM, Application Gateway)
 
+Once deployed, make a note of the outputs as you will need some of these to populate parameters in `app.bicepparam`
 ```bash
 az deployment sub create \
   --location uksouth \
@@ -64,7 +67,8 @@ az deployment sub create \
 
 ### 3. Import OpenAPI Spec to APIM
 
-> **Note:** This step is required due to Bicep's character limit on inline content. The OpenAPI spec must be imported manually via Azure CLI.
+> [!NOTE] 
+> This step is required due to Bicep's character limit on inline content. The OpenAPI spec must be imported manually via Azure CLI.
 
 ```bash
 az apim api import \
@@ -90,32 +94,4 @@ az apim api import \
    - **API Key**: Get from APIM subscription (see below)
    - **API Type**: `OpenAI`
    - **Auth**: `OAuth`
-   - 
-
-### Allow APIM Access to Foundry (if using network ACLs)
-
-```bash
-# Get APIM public IPs and add to Foundry firewall rules
-az apim show \
-  --resource-group rg-lb-core \
-  --name apim-open-webui \
-  --query publicIpAddresses -o tsv
-```
-
-## Architecture Notes
-
-**Scale to Zero (Enabled by Default):**
-- Container App configured with `minReplicas: 0` for cost optimization
-- Scales to zero after ~10-15 minutes of inactivity
-- Cold start time: 10-30 seconds when scaling from zero
-- Set `minReplicas: 1` in [app.bicep](infra/bicep/app.bicep) for always-on behavior
-
-**Multi-Model Support:**
-- Foundry supports multiple model providers: OpenAI GPT, xAI Grok, Mistral, Meta Llama, DeepSeek
-- All models use OpenAI-compatible API format
-- APIM provides unified gateway with managed identity authentication
-
-**Security:**
-- Authentication: Open WebUI uses native OAuth/OIDC integration with Entra ID (no EasyAuth)
-- Network: Container App ingress restricted by IP allowlist, SSL via Application Gateway
-- Production: Use internal ingress, private endpoints, WAF, and `minReplicas: 2`
+   - **Model Ids**: Input all models deployed to Foundry,e.g. `gpt-5-mini`
