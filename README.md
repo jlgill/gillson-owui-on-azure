@@ -66,7 +66,7 @@ az deployment sub create \
 - `outOpenWebUIAppId` - Entra ID app ID (for Step 3)
 
 **Also note the Container App Environment static IP:**
-- Azure Portal → Container Apps Environment → Properties → Static IP → Add to `parContainerAppStaticIp`
+- Azure Portal → Container Apps Environment → Overview → Static IP → Add to `parContainerAppStaticIp`
 
 **Grant Admin Consent:**
 1. Azure Portal → **Entra ID** → **App registrations** → **app-open-webui**
