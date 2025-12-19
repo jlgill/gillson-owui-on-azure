@@ -131,6 +131,10 @@ resource resEntraIdApp 'Microsoft.Graph/applications@v1.0' = {
           id: 'bc024368-1153-4739-b217-4326f2e966d0' // GroupMember.Read.All (Delegated)
           type: 'Scope'
         }
+        {
+          id: 'c72d93c1-a342-4d87-90ff-27b3e0e79e0c' // ProfilePhoto.Read.All (Delegated)
+          type: 'Scope'
+        }
       ]
     }
   ]
@@ -408,15 +412,11 @@ module modContainerApp 'br/public:avm/res/app/container-app:0.19.0' = {
           }
           {
             name: 'OAUTH_SCOPES'
-            value: 'openid email profile api://${varAppRegistrationName}/user_impersonation User.Read GroupMember.Read.All'
+            value: 'openid email profile api://${varAppRegistrationName}/user_impersonation User.Read GroupMember.Read.All ProfilePhoto.Read.All'
           }
           {
             name: 'OPENID_PROVIDER_URL'
             value: '${environment().authentication.loginEndpoint}${tenant().tenantId}/v2.0/.well-known/openid-configuration'
-          }
-          {
-            name: 'OAUTH_UPDATE_PICTURE_ON_LOGIN'
-            value: 'true'
           }
           {
             name: 'OAUTH_EMAIL_CLAIM'

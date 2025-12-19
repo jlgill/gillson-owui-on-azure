@@ -21,7 +21,7 @@ param parTags = {
   Owner: 'Dan Rios'
 }
 param parContainerAppScaleSettings = {
-  minReplicas: 0 // App Gateway Probe means it likely will never scale to 0 btw
+  minReplicas: 1
   maxReplicas: 1
 }
 param parFoundryDeployments = [

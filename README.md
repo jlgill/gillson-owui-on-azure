@@ -6,7 +6,6 @@ Deploy [Open WebUI](https://github.com/open-webui/open-webui) on Azure Container
 
 ![Azure Open WebUI architecture](docs/architecture.drawio.png)
 
-
 ## Features
 
 - **Open WebUI** on Azure Container Apps with native OAuth/OIDC Entra ID integration
@@ -18,7 +17,9 @@ Deploy [Open WebUI](https://github.com/open-webui/open-webui) on Azure Container
 - **Secure by default** using internal ingresses and private endpoints**
 
 > [!NOTE]
+>
 > - *Azure Container Apps still [requires Storage Account Access Keys for Azure File SMB mount?](https://learn.microsoft.com/en-us/azure/container-apps/storage-mounts-azure-files?tabs=bash#set-up-a-storage-account) :(
+>
 > - **At the time of writing the 'New' Foundry account does not support BYOD/Fully private networking yet. It has been secured via ACL for inbound networking.
 
 ## Prerequisites
@@ -32,12 +33,13 @@ Deploy [Open WebUI](https://github.com/open-webui/open-webui) on Azure Container
 
 > [!IMPORTANT]
 > Before deploying, update `infra/bicep/main.bicepparam` with your values:
+>
 > - `parApimPublisherEmail` - Your email address
 > - `parApimPublisherName` - Your name
 > - `parCustomDomain` - Your custom domain (e.g., `openwebui.example.com`)
 > - `parLocation` - Your Azure region
 
-### 1. Deploy Spoke Infrastructure (Container Apps, Foundry)
+### 1. Deploy App Infrastructure (Container Apps, Foundry)
 
 Deploy the spoke first to get Container App FQDN and Foundry endpoint:
 
@@ -60,21 +62,25 @@ az deployment sub create \
 ```
 
 **Note these outputs for Step 2:**
+
 - `outContainerAppFqdn` - Container App FQDN
 - `outVirtualNetworkName` - Spoke VNet name
 - `outFoundryEndpoint` - Microsoft Foundry endpoint URL
 - `outOpenWebUIAppId` - Entra ID app ID (for Step 3)
 
 **Also note the Container App Environment static IP:**
+
 - Azure Portal → Container Apps Environment → Overview → Static IP → Add to `parContainerAppStaticIp`
 
 **Grant Admin Consent:**
+
 1. Azure Portal → **Entra ID** → **App registrations** → **app-open-webui**
 2. **API permissions** → **Grant admin consent**
 
-### 2. Deploy Hub Infrastructure (APIM, Application Gateway)
+### 2. Deploy Hub/Shared Infrastructure (App Gateway / APIM)
 
 Update `infra/bicep/main.bicepparam` with values from Step 1:
+
 - `parContainerAppFqdn` - Use `outContainerAppFqdn` from Step 1
 - `parContainerAppStaticIp` - Container App Environment static IP
 - `parSpokeVirtualNetworkName` - Use `outVirtualNetworkName` from Step 1
@@ -90,16 +96,19 @@ az deployment sub create \
 ```
 
 **Note outputs:**
+
 - `outAppGatewayPublicIp` - Application Gateway public IP
 
 **Configure DNS:**
+
 - Add A record pointing to Application Gateway public IP (`outAppGatewayPublicIp`)
- 
+
 **If using Cloudflare:**
-- Enable proxy (orange cloud)
+
+- Enable proxy
 - Set SSL/TLS mode to **Full (strict)**
 
-### 3. Redeploy Hub with Entra App ID
+### 3. Redeploy Hub/Shared with Entra App ID
 
 Now redeploy the hub to enable APIM Entra ID token validation:
 
@@ -115,7 +124,7 @@ This updates APIM policies to validate Entra ID tokens from the Open WebUI app.
 
 ### 4. Import OpenAPI Spec to APIM
 
-> [!NOTE] 
+> [!NOTE]
 > This step is required due to Bicep's character limit on inline content. The OpenAPI spec must be imported manually via Azure CLI.
 
 ```bash
@@ -140,11 +149,13 @@ az apim api import \
 3. Add OpenAI-compatible connection:
    - **API Base URL**: `https://<apim-name>.azure-api.net/openai/v1`
    - **Headers**: Get from APIM subscription
+
    ```json
    {
     "api-key": "<sub-key>"
    }
    ```
+
    - **API Type**: `OpenAI`
    - **Auth**: `OAuth`
    - **Model Ids**: Input all models deployed to Foundry,e.g. `gpt-5-mini`
