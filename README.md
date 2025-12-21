@@ -40,7 +40,12 @@ Deploy [Open WebUI](https://github.com/open-webui/open-webui) on Azure Container
 > - `parCustomDomain` - Your custom domain (e.g., `openwebui.example.com`)
 > - `parLocation` - Your Azure region
 >
-> **Naming Convention:** If you change `parNamePrefix` in `app.bicepparam`, update `parFoundryName` in `main.bicepparam` to match (`${parNamePrefix}-foundry`).
+> **`infra/bicep/app.bicepparam`:**
+> - `parCustomDomain` - Same custom domain as above
+> - `parHubResourceGroupName` - Must match `parResourceGroupName` in main.bicepparam
+> - `parHubVirtualNetworkName` - Must match `parVirtualNetworkName` in main.bicepparam
+>
+> **Naming Convention:** The Foundry resource is named `${parNamePrefix}-foundry` where `parNamePrefix` defaults to `open-webui-app` in app.bicep. Ensure `parFoundryName` in `main.bicepparam` matches this (e.g., `open-webui-app-foundry`).
 
 ### 1. Deploy Hub Infrastructure (VNet, DNS Zones, APIM shell)
 
@@ -53,7 +58,7 @@ az deployment sub create --location uksouth --template-file infra/bicep/main.bic
 ```
 
 > [!NOTE]
-> This first deploy uses `parConfigureFoundry=false` (default) - Foundry backend and RBAC are skipped. We'll redeploy with `parConfigureFoundry=true` after the spoke is created.
+> This first deploy uses `parConfigureFoundry=false` (default) - Foundry backend, RBAC, and Entra token validation use placeholders. We'll redeploy with `parConfigureFoundry=true` and `parOpenWebUIAppId` after the spoke is created.
 
 **Note the output:**
 
@@ -63,20 +68,33 @@ az deployment sub create --location uksouth --template-file infra/bicep/main.bic
 
 Create the PFX certificate and deploy spoke:
 
+**Linux/macOS:**
+
 ```bash
 # Create passwordless PFX and base64 encode it
 openssl pkcs12 -export -out cloudflare-origin.pfx -inkey origin.key -in origin.pem -password pass:
-cat cloudflare-origin.pfx | base64 -w0 > pfx.b64
+base64 -w0 cloudflare-origin.pfx > pfx.b64
 
 # Deploy spoke infrastructure (Foundry PE will use hub's DNS zones)
 az deployment sub create --location uksouth --template-file infra/bicep/app.bicep --parameters infra/bicep/app.bicepparam --parameters parCertificatePfxBase64="$(cat pfx.b64)"
 ```
 
+**Windows (PowerShell):**
+
+```powershell
+# Create passwordless PFX and base64 encode it
+openssl pkcs12 -export -out cloudflare-origin.pfx -inkey origin.key -in origin.pem -password pass:
+$pfxBase64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes("cloudflare-origin.pfx"))
+
+# Deploy spoke infrastructure (Foundry PE will use hub's DNS zones)
+az deployment sub create --location uksouth --template-file infra/bicep/app.bicep --parameters infra/bicep/app.bicepparam --parameters parCertificatePfxBase64=$pfxBase64
+```
+
 **Note these outputs:**
 
 - `outContainerAppFqdn` - Container App FQDN
-- `outVirtualNetworkName` - Spoke VNet name  
-- `outOpenWebUIAppId` - Entra ID app ID
+- `outVirtualNetworkName` - Spoke VNet name
+- `outOpenWebUIAppId` - Entra ID App Registration ID
 
 **Also note the Container App Environment static IP:**
 
@@ -94,12 +112,12 @@ az deployment sub create --location uksouth --template-file infra/bicep/app.bice
 1. Azure Portal → **Entra ID** → **App registrations** → **app-open-webui**
 2. **API permissions** → **Grant admin consent**
 
-### 3. Redeploy Hub (APIM Foundry Backend + RBAC)
+### 3. Redeploy Hub (APIM Foundry Backend, RBAC + Entra Validation)
 
-Redeploy hub with `parConfigureFoundry=true` to configure APIM with Foundry backend and grant RBAC:
+Redeploy hub with `parConfigureFoundry=true` to configure APIM with Foundry backend, grant RBAC, and enable Entra ID token validation:
 
 ```bash
-# Redeploy hub - now APIM gets Foundry endpoint and RBAC is assigned
+# Redeploy hub - now APIM gets Foundry endpoint, RBAC is assigned, and Entra validation is enabled
 az deployment sub create --location uksouth --template-file infra/bicep/main.bicep --parameters infra/bicep/main.bicepparam --parameters parConfigureFoundry=true
 ```
 

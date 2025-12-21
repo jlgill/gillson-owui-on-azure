@@ -23,6 +23,9 @@ param parTrustedRootCertificateSecretName = 'cloudflare-origin-ca'
 param parSslCertificateSecretName = 'cloudflare-origin-cert'
 // Foundry resource name in spoke - must match name created by app.bicep ('${parNamePrefix}-foundry')
 param parFoundryName = 'open-webui-app-foundry'
+// Entra ID App Registration ID from app.bicep output (outOpenWebUIAppId)
+// Used for APIM token validation policy
+param parOpenWebUIAppId = '7eb52126-ee47-4700-8561-77f433fdd2eb'
 // Set to true on SECOND hub deployment after Foundry exists (Step 3)
 // First deployment: false (creates hub networking + APIM without Foundry backend)
 // Second deployment: true (configures APIM with Foundry endpoint + RBAC)

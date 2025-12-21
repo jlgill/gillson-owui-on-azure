@@ -40,7 +40,7 @@ var varFoundryBackends = !empty(parFoundryEndpoint) ? [
   }
 ] : []
 
-// Load policy files
+// Load policy file
 var varOpenAIPolicyXml = loadTextContent('../policies/openai-api.xml')
 
 // API Management Service - Base infrastructure
@@ -104,13 +104,15 @@ module modApimNamedValueTenantId 'br/public:avm/res/api-management/service/named
   ]
 }
 
-module modApimNamedValueAppId 'br/public:avm/res/api-management/service/named-value:0.1.1' = if (!empty(parOpenWebUIAppId)) {
+// Named value for Open WebUI App ID - always created, uses placeholder if not yet configured
+// Placeholder ensures policy deploys successfully; real value set on Step 3 redeploy
+module modApimNamedValueAppId 'br/public:avm/res/api-management/service/named-value:0.1.1' = {
   params: {
     apiManagementServiceName: parApimName
     name: 'openwebui-app-id'
     displayName: 'openwebui-app-id'
     secret: false
-    value: parOpenWebUIAppId
+    value: !empty(parOpenWebUIAppId) ? parOpenWebUIAppId : '00000000-0000-0000-0000-000000000000'
   }
   dependsOn: [
     modApim
@@ -157,6 +159,7 @@ module modApimApi 'br/public:avm/res/api-management/service/api:0.1.1' = {
   }
   dependsOn: [
     modApimNamedValueTenantId
+    modApimNamedValueAppId
     modApimProduct
   ]
 }

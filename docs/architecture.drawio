@@ -1,10 +1,10 @@
 <mxfile host="65bd71144e">
     <diagram id="OpenWebUI-Architecture" name="Open WebUI Architecture">
-        <mxGraphModel dx="1378" dy="1606" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="900" math="0" shadow="0">
+        <mxGraphModel dx="1194" dy="1499" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="900" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
-                <UserObject label="&#xa;&lt;a href=&quot;https://openwebui.com/logo.png&quot;&gt;logo.png (1000×1000)&lt;/a&gt;&#xa;&#xa;" link="&#xa;&lt;a href=&quot;https://openwebui.com/logo.png&quot;&gt;logo.png (1000×1000)&lt;/a&gt;&#xa;&#xa;" id="bg">
+                <UserObject label="&#xa;logo.png (1000×1000)&#xa;&#xa;" id="bg">
                     <mxCell style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FAFBFC;strokeColor=none;" parent="1" vertex="1">
                         <mxGeometry y="-5" width="1300" height="750" as="geometry"/>
                     </mxCell>
@@ -275,7 +275,7 @@
                     <mxGeometry x="136" y="409.11" width="21" height="33.89" as="geometry"/>
                 </mxCell>
                 <mxCell id="18" value="" style="image;aspect=fixed;html=1;points=[];align=center;fontSize=12;image=img/lib/azure2/networking/DNS_Zones.svg;" parent="1" vertex="1">
-                    <mxGeometry x="610" y="306" width="27" height="27" as="geometry"/>
+                    <mxGeometry x="188" y="238" width="27" height="27" as="geometry"/>
                 </mxCell>
                 <mxCell id="19" value="" style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=default;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://az-icons.com/export/icons/2aacf2aeb5ee7d7f796481757cc97b0a.svg;" parent="1" vertex="1">
                     <mxGeometry x="610" y="393" width="60" height="60" as="geometry"/>
@@ -306,6 +306,12 @@
                 </mxCell>
                 <mxCell id="32" value="Production Grade Quick Start" style="text;strokeColor=none;align=center;fillColor=none;html=1;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
                     <mxGeometry x="554" y="40" width="180" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="33" value="" style="image;aspect=fixed;html=1;points=[];align=center;fontSize=12;image=img/lib/azure2/other/Private_Endpoints.svg;" vertex="1" parent="1">
+                    <mxGeometry x="610" y="301.56" width="28" height="26.63" as="geometry"/>
+                </mxCell>
+                <mxCell id="36" value="" style="image;aspect=fixed;html=1;points=[];align=center;fontSize=12;image=img/lib/azure2/other/Private_Endpoints.svg;" vertex="1" parent="1">
+                    <mxGeometry x="600" y="590" width="25.95" height="24.69" as="geometry"/>
                 </mxCell>
             </root>
         </mxGraphModel>
