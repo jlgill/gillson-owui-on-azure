@@ -207,7 +207,6 @@ module modVirtualNetwork 'br/public:avm/res/network/virtual-network:0.7.1' = {
         networkSecurityGroupResourceId: modNsgContainerApp.outputs.resourceId
         serviceEndpoints: [
           'Microsoft.Storage'
-          'Microsoft.CognitiveServices'
         ]
       }
     ]
@@ -640,29 +639,8 @@ module modFoundry 'br/public:avm/res/cognitive-services/account:0.14.0' = {
       }
     ]
     customSubDomainName: replace('${parNamePrefix}-foundry', '-', '')
-    networkAcls:{
-      defaultAction: 'Deny'
-      virtualNetworkRules:[
-        {
-          id: modVirtualNetwork.outputs.subnetResourceIds[0]
-          ignoreMissingVnetServiceEndpoint: false
-        }
-      ]
-    }
     deployments: parFoundryDeployments
-    // Container App RBAC - APIM RBAC is assigned in main.bicep after APIM is created
-    roleAssignments: [
-      {
-        principalId: modContainerApp.outputs.systemAssignedMIPrincipalId!
-        principalType: 'ServicePrincipal'
-        roleDefinitionIdOrName: varRoleDefinitions.cognitiveServicesUser
-      }
-      {
-        principalId: modContainerApp.outputs.systemAssignedMIPrincipalId!
-        principalType: 'ServicePrincipal'
-        roleDefinitionIdOrName: varRoleDefinitions.azureAIUser
-      }
-    ]
+    // APIM RBAC is assigned in main.bicep after APIM is created
   }
   dependsOn: [modResourceGroup]
 }

@@ -18,9 +18,9 @@ Deploy [Open WebUI](https://github.com/open-webui/open-webui) on Azure Container
 
 > [!NOTE]
 >
-> - *Azure Container Apps still [requires Storage Account Access Keys for Azure File SMB mount?](https://learn.microsoft.com/en-us/azure/container-apps/storage-mounts-azure-files?tabs=bash#set-up-a-storage-account) :(
+> - *Azure Container Apps still [requires Storage Account Access Keys for Azure File SMB mount](https://learn.microsoft.com/en-us/azure/container-apps/storage-mounts-azure-files?tabs=bash#set-up-a-storage-account) :(
 >
-> - **At the time of writing the 'New' Foundry account does not support BYOD/Fully private networking yet. It has been secured via ACL for inbound networking.
+> - **All traffic to Foundry flows through APIM via Private Endpoint for complete network isolation.
 
 ## Prerequisites
 
