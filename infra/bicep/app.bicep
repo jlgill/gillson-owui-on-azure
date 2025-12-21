@@ -541,41 +541,43 @@ module modContainerApp 'br/public:avm/res/app/container-app:0.19.0' = {
         volumeMounts: [
           {
             volumeName: 'open-webui-share'
-            mountPath: '/app/data'
+            mountPath: '/app/backend/data'
           }
         ]
-        probes: [
-          {
-            type: 'startup'
-            httpGet: {
-              path: '/health'
-              port: 8080
-            }
-            initialDelaySeconds: 5
-            periodSeconds: 5
-            failureThreshold: 30 // 30 × 5s = 150s max startup time
-          }
-          {
-            type: 'liveness'
-            httpGet: {
-              path: '/health'
-              port: 8080
-            }
-            initialDelaySeconds: 30
-            periodSeconds: 10
-            failureThreshold: 3
-          }
-          {
-            type: 'readiness'
-            httpGet: {
-              path: '/health'
-              port: 8080
-            }
-            initialDelaySeconds: 5
-            periodSeconds: 5
-            failureThreshold: 3
-          }
-        ]
+        // Health probes commented out for initial deployment due to slow first boot
+        // After the initial deployment completes, these can be uncommented to improve reliability
+        // probes: [
+        //   {
+        //     type: 'startup'
+        //     httpGet: {
+        //       path: '/health'
+        //       port: 8080
+        //     }
+        //     initialDelaySeconds: 5
+        //     periodSeconds: 5
+        //     failureThreshold: 60
+        //   }
+        //   {
+        //     type: 'liveness'
+        //     httpGet: {
+        //       path: '/health'
+        //       port: 8080
+        //     }
+        //     initialDelaySeconds: 30
+        //     periodSeconds: 10
+        //     failureThreshold: 3
+        //   }
+        //   {
+        //     type: 'readiness'
+        //     httpGet: {
+        //       path: '/health'
+        //       port: 8080
+        //     }
+        //     initialDelaySeconds: 10
+        //     periodSeconds: 5
+        //     failureThreshold: 3
+        //   }
+        // ]
       }
     ]
     secrets: [
