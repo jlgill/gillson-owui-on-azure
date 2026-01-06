@@ -3,7 +3,7 @@ targetScope = 'subscription'
 extension 'br:mcr.microsoft.com/bicep/extensions/microsoftgraph/v1.0:1.0.0'
 
 // ========== Type Imports ==========
-import { FoundryDeploymentType, TagsType } from './shared/types.bicep'
+import { FoundryDeploymentType, PostgresConfigType, TagsType } from './shared/types.bicep'
 
 // ========== Parameters ==========
 param parLocation string
@@ -17,6 +17,18 @@ param parCertificateName string
 param parApimName string = 'apim-open-webui'
 @secure()
 param parCertificatePfxBase64 string = ''
+@secure()
+@description('PostgreSQL administrator password. Pass inline via CLI: --parameters parPostgresAdminPassword=\'YourSecurePassword\'')
+param parPostgresAdminPassword string = ''
+@description('PostgreSQL Flexible Server configuration')
+param parPostgresConfig PostgresConfigType = {
+  skuName: 'Standard_B1ms'
+  tier: 'Burstable'
+  version: '16'
+  storageSizeGB: 32
+  databaseName: 'openwebui'
+  adminUsername: 'pgadmin'
+}
 param parContainerAppAllowedIpAddresses array = []
 param parContainerAppScaleSettings object
 param parFoundryDeployments FoundryDeploymentType[]
@@ -51,9 +63,15 @@ resource resAIServicesDnsZone 'Microsoft.Network/privateDnsZones@2024-06-01' exi
   name: 'privatelink.services.ai.azure.com'
 }
 
+resource resPostgresDnsZone 'Microsoft.Network/privateDnsZones@2024-06-01' existing = {
+  scope: resourceGroup(parHubResourceGroupName)
+  name: 'privatelink.postgres.database.azure.com'
+}
+
 // Variables
 var varOpenWebUiShare = 'open-webui-share'
 var varAppRegistrationName = 'app-open-webui'
+var varPostgresServerName = '${parNamePrefix}-psql'
 var varIpSecurityRestrictions = [for ip in parContainerAppAllowedIpAddresses: {
   name: 'allow-${replace(ip, '/', '-')}'
   ipAddressRange: ip
@@ -326,6 +344,86 @@ module modStorageAccount 'br/public:avm/res/storage/storage-account:0.29.0' = {
   dependsOn: [modResourceGroup]
 }
 
+// MARK: - Link hub private DNS zones to app VNet for private endpoint resolution
+// All DNS zones in hub that need spoke VNet links
+var varAllDnsZones = [
+  'privatelink.cognitiveservices.azure.com'
+  'privatelink.openai.azure.com'
+  'privatelink.services.ai.azure.com'
+  'privatelink.postgres.database.azure.com'
+]
+
+// Link all hub DNS zones to app VNet using AVM
+module modDnsZoneLinks 'br/public:avm/res/network/private-dns-zone:0.8.0' = [for (zone, i) in varAllDnsZones: {
+  scope: resourceGroup(parHubResourceGroupName)
+  name: 'dns-zone-link-${i}'
+  params: {
+    name: zone
+    location: 'global'
+    virtualNetworkLinks: [
+      {
+        name: '${parNamePrefix}-spoke-vnet-link'
+        virtualNetworkResourceId: modVirtualNetwork.outputs.resourceId
+        registrationEnabled: false
+      }
+    ]
+  }
+}]
+
+// MARK: - PostgreSQL Flexible Server
+module modPostgresServer 'br/public:avm/res/db-for-postgre-sql/flexible-server:0.15.1' = {
+  scope: resourceGroup(parResourceGroupName)
+  params: {
+    name: varPostgresServerName
+    location: parLocation
+    skuName: parPostgresConfig.skuName
+    tier: parPostgresConfig.tier
+    version: parPostgresConfig.version
+    storageSizeGB: parPostgresConfig.storageSizeGB
+    availabilityZone: -1
+    administratorLogin: parPostgresConfig.adminUsername
+    administratorLoginPassword: parPostgresAdminPassword
+    // Enable password authentication for Open WebUI (required - Entra ID auth not supported)
+    authConfig: {
+      activeDirectoryAuth: 'Disabled'
+      passwordAuth: 'Enabled'
+    }
+    databases: [
+      {
+        name: parPostgresConfig.databaseName
+        charset: 'UTF8'
+        collation: 'en_US.utf8'
+      }
+    ]
+    highAvailability: 'Disabled'
+    privateEndpoints: [
+      {
+        name: '${varPostgresServerName}-pe'
+        subnetResourceId: resHubPeSubnet.id
+        privateDnsZoneGroup: {
+          privateDnsZoneGroupConfigs: [
+            {
+              privateDnsZoneResourceId: resPostgresDnsZone.id
+            }
+          ]
+        }
+      }
+    ]
+  }
+  dependsOn: [modResourceGroup]
+}
+
+// MARK: - Store PostgreSQL Connection String in Key Vault
+module modPostgresConnectionStringSecret 'br/public:avm/res/key-vault/vault/secret:0.1.0' = {
+  scope: resourceGroup(parResourceGroupName)
+  name: 'postgres-connection-string-secret'
+  params: {
+    keyVaultName: modKeyVault.outputs.name
+    name: 'postgres-connection-string'
+    value: 'postgresql://${parPostgresConfig.adminUsername}:${parPostgresAdminPassword}@${modPostgresServer.outputs.?fqdn ?? ''}:5432/${parPostgresConfig.databaseName}?sslmode=require'
+  }
+}
+
 // MARK: - Container App Environment Managed Identity
 module modEnvIdentity 'br/public:avm/res/managed-identity/user-assigned-identity:0.4.1' = {
   scope: resourceGroup(parResourceGroupName)
@@ -537,6 +635,10 @@ module modContainerApp 'br/public:avm/res/app/container-app:0.19.0' = {
             name: 'AIOHTTP_CLIENT_TIMEOUT'
             value: '300'
           }
+          {
+            name: 'DATABASE_URL'
+            secretRef: 'database-url'
+          }
         ]
         volumeMounts: [
           {
@@ -582,8 +684,8 @@ module modContainerApp 'br/public:avm/res/app/container-app:0.19.0' = {
     ]
     secrets: [
       {
-        name: 'storage-account-access-key'
-        keyVaultUrl: '${modKeyVault.outputs.uri}secrets/accessKey1'
+        name: 'database-url'
+        keyVaultUrl: '${modKeyVault.outputs.uri}secrets/postgres-connection-string'
         identity: 'System'
       }
     ]
@@ -631,6 +733,10 @@ module modFoundry 'br/public:avm/res/cognitive-services/account:0.14.0' = {
       systemAssigned: true
     }
     allowProjectManagement: true
+    publicNetworkAccess: 'Disabled'
+    networkAcls: {
+      defaultAction: 'Deny'
+    }
     privateEndpoints: [
       {
         name: '${parNamePrefix}-foundry-pe'

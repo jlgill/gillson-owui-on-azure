@@ -152,6 +152,21 @@ module modFoundryPrivateDnsZones 'br/public:avm/res/network/private-dns-zone:0.8
   }
 }]
 
+// Private DNS Zone for PostgreSQL Flexible Server
+module modPostgresDnsZone 'br/public:avm/res/network/private-dns-zone:0.8.0' = {
+  name: 'postgresDnsZone'
+  params: {
+    name: 'privatelink.postgres.database.azure.com'
+    location: 'global'
+    virtualNetworkLinks: [
+      {
+        virtualNetworkResourceId: modVirtualNetwork.outputs.resourceId
+        registrationEnabled: false
+      }
+    ]
+  }
+}
+
 // Outputs
 output virtualNetworkResourceId string = modVirtualNetwork.outputs.resourceId
 output virtualNetworkName string = modVirtualNetwork.outputs.name

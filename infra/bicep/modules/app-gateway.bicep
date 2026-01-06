@@ -100,7 +100,8 @@ module modAppGateway 'br/public:avm/res/network/application-gateway:0.6.0' = {
           cookieBasedAffinity: 'Enabled'
           pickHostNameFromBackendAddress: !empty(parCustomDomain) ? false : true
           hostName: !empty(parCustomDomain) ? parCustomDomain : null
-          requestTimeout: 30
+          // Bump timeout to tolerate slower cold starts and long requests (default is 30s)
+          requestTimeout: 120
           trustedRootCertificates: !empty(parCustomDomain) ? [
             {
               id: resourceId(subscription().subscriptionId, parResourceGroupName, 'Microsoft.Network/applicationGateways/trustedRootCertificates', parAppGatewayName, parTrustedRootCertificateSecretName)
@@ -117,9 +118,10 @@ module modAppGateway 'br/public:avm/res/network/application-gateway:0.6.0' = {
         name: 'containerapp-health-probe'
         properties: {
           protocol: 'Https'
-          path: '/'
+          // Use a lightweight API endpoint and give more time for cold starts
+          path: '/api/version'
           interval: 30
-          timeout: 30
+          timeout: 60
           unhealthyThreshold: 3
           pickHostNameFromBackendHttpSettings: true
           minServers: 0

@@ -63,3 +63,20 @@ type RbacAssignmentType = {
   @description('Optional role name for clarity')
   roleName: string?
 }
+
+@export()
+@description('Configuration for Azure Database for PostgreSQL Flexible Server')
+type PostgresConfigType = {
+  @description('SKU name (e.g., Standard_B1ms, Standard_D2ds_v5)')
+  skuName: string
+  @description('Pricing tier')
+  tier: 'Burstable' | 'GeneralPurpose' | 'MemoryOptimized'
+  @description('PostgreSQL major version')
+  version: '14' | '15' | '16' | '17'
+  @description('Storage size in GB (allowed values)')
+  storageSizeGB: 32 | 64 | 128 | 256 | 512 | 1024 | 2048 | 4096 | 8192 | 16384
+  @description('Database name to create')
+  databaseName: string
+  @description('Administrator username')
+  adminUsername: string
+}
