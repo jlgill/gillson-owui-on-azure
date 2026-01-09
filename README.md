@@ -21,7 +21,7 @@ Deploy [Open WebUI](https://github.com/open-webui/open-webui) on Azure Container
 > [!NOTE]
 >
 > - *Azure Container Apps still [requires Storage Account Access Keys for Azure File SMB mount](https://learn.microsoft.com/en-us/azure/container-apps/storage-mounts-azure-files?tabs=bash#set-up-a-storage-account) :(
-> **Open WebUI does not support Entra authentication for PostgresSQL yet.
+> - **Open WebUI does not support Entra authentication for PostgreSQL yet.
 
 ## Prerequisites
 
