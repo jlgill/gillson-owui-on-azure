@@ -16,6 +16,9 @@ param parUserAssignedIdentityResourceId string
 param parHubKeyVaultUri string
 param parResourceGroupName string
 
+// Determine if we have SSL cert available (spoke Key Vault exists with cert)
+var varHasSslCert = !empty(parCustomDomain) && !empty(parSpokeKeyVaultName)
+
 // Application Gateway using AVM module
 module modAppGateway 'br/public:avm/res/network/application-gateway:0.6.0' = {
   params: {
@@ -29,7 +32,7 @@ module modAppGateway 'br/public:avm/res/network/application-gateway:0.6.0' = {
         parUserAssignedIdentityResourceId
       ]
     } : null
-    trustedRootCertificates: !empty(parCustomDomain) ? [
+    trustedRootCertificates: varHasSslCert ? [
       {
         name: parTrustedRootCertificateSecretName
         properties: {
@@ -37,7 +40,7 @@ module modAppGateway 'br/public:avm/res/network/application-gateway:0.6.0' = {
         }
       }
     ] : []
-    sslCertificates: (!empty(parCustomDomain) && !empty(parSpokeKeyVaultName)) ? [
+    sslCertificates: varHasSslCert ? [
       {
         name: parSslCertificateSecretName
         properties: {
@@ -102,7 +105,7 @@ module modAppGateway 'br/public:avm/res/network/application-gateway:0.6.0' = {
           hostName: !empty(parCustomDomain) ? parCustomDomain : null
           // Bump timeout to tolerate slower cold starts and long requests (default is 30s)
           requestTimeout: 120
-          trustedRootCertificates: !empty(parCustomDomain) ? [
+          trustedRootCertificates: varHasSslCert ? [
             {
               id: resourceId(subscription().subscriptionId, parResourceGroupName, 'Microsoft.Network/applicationGateways/trustedRootCertificates', parAppGatewayName, parTrustedRootCertificateSecretName)
             }
@@ -131,7 +134,9 @@ module modAppGateway 'br/public:avm/res/network/application-gateway:0.6.0' = {
         }
       }
     ]
-    httpListeners: [
+    // HTTP listeners - always include HTTP, conditionally include HTTPS
+    httpListeners: varHasSslCert ? [
+      // HTTP listener (for redirect to HTTPS)
       {
         name: 'containerapp-http-listener'
         properties: {
@@ -145,6 +150,7 @@ module modAppGateway 'br/public:avm/res/network/application-gateway:0.6.0' = {
           hostName: parCustomDomain
         }
       }
+      // HTTPS listener (only when SSL cert available)
       {
         name: 'containerapp-https-listener'
         properties: {
@@ -156,13 +162,30 @@ module modAppGateway 'br/public:avm/res/network/application-gateway:0.6.0' = {
           }
           protocol: 'Https'
           hostName: parCustomDomain
-          sslCertificate: (!empty(parCustomDomain) && !empty(parSpokeKeyVaultName)) ? {
+          sslCertificate: {
             id: resourceId(subscription().subscriptionId, parResourceGroupName, 'Microsoft.Network/applicationGateways/sslCertificates', parAppGatewayName, parSslCertificateSecretName)
-          } : null
+          }
+        }
+      }
+    ] : [
+      // HTTP-only listener (first deployment - no SSL cert yet)
+      {
+        name: 'containerapp-http-listener'
+        properties: {
+          frontendIPConfiguration: {
+            id: resourceId(subscription().subscriptionId, parResourceGroupName, 'Microsoft.Network/applicationGateways/frontendIPConfigurations', parAppGatewayName, 'appgw-frontend-ip')
+          }
+          frontendPort: {
+            id: resourceId(subscription().subscriptionId, parResourceGroupName, 'Microsoft.Network/applicationGateways/frontendPorts', parAppGatewayName, 'port-80')
+          }
+          protocol: 'Http'
+          hostName: parCustomDomain
         }
       }
     ]
-    requestRoutingRules: [
+    // Routing rules - different config based on SSL availability
+    requestRoutingRules: varHasSslCert ? [
+      // HTTP to HTTPS redirect rule
       {
         name: 'containerapp-routing-rule'
         properties: {
@@ -176,6 +199,7 @@ module modAppGateway 'br/public:avm/res/network/application-gateway:0.6.0' = {
           }
         }
       }
+      // HTTPS routing rule
       {
         name: 'containerapp-https-routing-rule'
         properties: {
@@ -192,8 +216,27 @@ module modAppGateway 'br/public:avm/res/network/application-gateway:0.6.0' = {
           }
         }
       }
+    ] : [
+      // HTTP-only rule (first deployment - routes directly to backend)
+      {
+        name: 'containerapp-routing-rule'
+        properties: {
+          ruleType: 'Basic'
+          priority: 100
+          httpListener: {
+            id: resourceId(subscription().subscriptionId, parResourceGroupName, 'Microsoft.Network/applicationGateways/httpListeners', parAppGatewayName, 'containerapp-http-listener')
+          }
+          backendAddressPool: {
+            id: resourceId(subscription().subscriptionId, parResourceGroupName, 'Microsoft.Network/applicationGateways/backendAddressPools', parAppGatewayName, 'containerapp-backend-pool')
+          }
+          backendHttpSettings: {
+            id: resourceId(subscription().subscriptionId, parResourceGroupName, 'Microsoft.Network/applicationGateways/backendHttpSettingsCollection', parAppGatewayName, 'containerapp-backend-settings')
+          }
+        }
+      }
     ]
-    redirectConfigurations: [
+    // Redirect config - only when SSL available
+    redirectConfigurations: varHasSslCert ? [
       {
         name: 'http-to-https-redirect'
         properties: {
@@ -205,7 +248,7 @@ module modAppGateway 'br/public:avm/res/network/application-gateway:0.6.0' = {
           includeQueryString: true
         }
       }
-    ]
+    ] : []
   }
 }
 

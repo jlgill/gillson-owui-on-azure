@@ -1,37 +1,59 @@
 using 'main.bicep'
-// Change values as required for your setup/demo/poc
-param parApimName = 'apim-open-webui'
-param parLocation = 'uksouth'
-param parApimPublisherEmail = 'changeme@example.com'
-param parApimPublisherName = 'Your name'
-param parAppGatewayName = 'appgw-open-webui'
-param parResourceGroupName = 'rg-lb-core'
-param parVirtualNetworkName = 'vnet-lb-core'
-param parVirtualNetworkAddressPrefix = '10.0.0.0/24'
-param parApimSubnetAddressPrefix = '10.0.0.0/28'
-param parAppGatewaySubnetAddressPrefix = '10.0.0.64/26'
-param parPeSubnetAddressPrefix = '10.0.0.128/28'
-param parApimSku = 'Developer' // Cheap for demo purposes
-param parAppGatewaySku = 'Standard_v2'
-param parContainerAppFqdn = 'open-webui-app-aca.jollyfield-adf491b7.uksouth.azurecontainerapps.io'
-param parContainerAppStaticIp = '10.0.4.91'
-param parSpokeResourceGroupName = 'rg-open-webui-app'
-param parSpokeVirtualNetworkName = 'open-webui-app-vnet'
-param parCustomDomain = 'openwebui.example.com'
-param parSpokeKeyVaultName = 'open-webui-app-kv'
-param parTrustedRootCertificateSecretName = 'cloudflare-origin-ca'
-param parSslCertificateSecretName = 'cloudflare-origin-cert'
-// Foundry resource name in spoke - must match name created by app.bicep ('${parNamePrefix}-foundry')
-param parFoundryName = 'open-webui-app-foundry'
-// Entra ID App Registration ID from app.bicep output (outOpenWebUIAppId)
-// Used for APIM token validation policy
-param parOpenWebUIAppId = '00000000-0000-0000-0000-000000000000'
+
+// ========== Shared Configuration ==========
+// Import shared config to ensure consistency with app.bicep
+import { sharedConfig, placeholderMarker } from './shared/config.bicep'
+
+// ========== IMPORTANT: Review shared/config.bicep first ==========
+// Most configuration values are centralized there. Only override here if needed.
+
+// ===== Core Configuration (from shared config) =====
+param parLocation = sharedConfig.location
+param parCustomDomain = sharedConfig.customDomain
+param parApimPublisherEmail = sharedConfig.apimPublisherEmail
+param parApimPublisherName = sharedConfig.apimPublisherName
+param parApimName = sharedConfig.apimName
+param parAppGatewayName = sharedConfig.appGatewayName
+param parResourceGroupName = sharedConfig.hubResourceGroupName
+param parVirtualNetworkName = sharedConfig.hubVirtualNetworkName
+param parSpokeResourceGroupName = sharedConfig.spokeResourceGroupName
+param parTags = sharedConfig.tags
+
+// ===== Network Configuration (from shared config) =====
+param parVirtualNetworkAddressPrefix = sharedConfig.hubVnetAddressPrefix
+param parApimSubnetAddressPrefix = sharedConfig.apimSubnetAddressPrefix
+param parAppGatewaySubnetAddressPrefix = sharedConfig.appGatewaySubnetAddressPrefix
+param parPeSubnetAddressPrefix = sharedConfig.peSubnetAddressPrefix
+
+// ===== SKU Configuration (from shared config) =====
+param parApimSku = sharedConfig.apimSku
+param parAppGatewaySku = sharedConfig.appGatewaySku
+
+// ===== Certificate Configuration (from shared config) =====
+param parTrustedRootCertificateSecretName = sharedConfig.trustedRootCertificateSecretName
+param parSslCertificateSecretName = sharedConfig.sslCertificateName
+
+// ===== Spoke Name Prefix =====
+// Used to auto-derive spoke resource names (VNet, Key Vault, Foundry)
+// Must match parNamePrefix in app.bicepparam
+param parSpokeNamePrefix = sharedConfig.spokeNamePrefix
+
+// ========== Step 2 Outputs ==========
+// IMPORTANT: These values must be updated AFTER running app.bicep (Step 2)
+// Get these values from the app.bicep deployment outputs:
+//   - parContainerAppFqdn: outContainerAppFqdn
+//   - parContainerAppStaticIp: outContainerAppEnvStaticIp
+//   - parOpenWebUIAppId: outOpenWebUIAppId
+//
+// On first deployment, leave as placeholders - the deployment will handle this gracefully.
+// After Step 2, update these values and redeploy with parConfigureFoundry=true
+
+param parContainerAppFqdn = 'owui-app-aca.nicedune-c71b030a.westus.azurecontainerapps.io'
+param parContainerAppStaticIp = '10.0.4.99'
+param parOpenWebUIAppId = '26313121-1f1d-4263-846f-90e5385adab3'
+
+// ========== Foundry Configuration ==========
 // Set to true on SECOND hub deployment after Foundry exists (Step 3)
 // First deployment: false (creates hub networking + APIM without Foundry backend)
 // Second deployment: true (configures APIM with Foundry endpoint + RBAC)
 param parConfigureFoundry = false
-param parTags = {
-  Application: 'Open WebUI'
-  Environment: 'Demo'
-  Owner: 'Dan Rios'
-}

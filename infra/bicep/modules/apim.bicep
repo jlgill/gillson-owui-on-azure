@@ -136,7 +136,8 @@ module modApimProduct 'br/public:avm/res/api-management/service/product:0.1.1' =
 }
 
 // API - Deploy after named values and product exist
-module modApimApi 'br/public:avm/res/api-management/service/api:0.1.1' = {
+// Only deploy when Foundry backend is configured (policy references foundry-backend)
+module modApimApi 'br/public:avm/res/api-management/service/api:0.1.1' = if (!empty(parFoundryEndpoint)) {
   params: {
     apiManagementServiceName: parApimName
     name: 'openai'
@@ -165,7 +166,8 @@ module modApimApi 'br/public:avm/res/api-management/service/api:0.1.1' = {
 }
 
 // API-Product Association - Deploy after both API and Product exist
-module modApimProductApi 'br/public:avm/res/api-management/service/product/api:0.1.1' = {
+// Only deploy when Foundry backend is configured
+module modApimProductApi 'br/public:avm/res/api-management/service/product/api:0.1.1' = if (!empty(parFoundryEndpoint)) {
   params: {
     apiManagementServiceName: parApimName
     productName: 'platform-services'
@@ -188,7 +190,8 @@ module modApimMetricsPublisherRbac 'br/public:avm/ptn/authorization/resource-rol
 }
 
 // Configure LLM logging for the openai API diagnostic
-resource resOpenAIDiagnosticLLMLogging 'Microsoft.ApiManagement/service/apis/diagnostics@2024-06-01-preview' = {
+// Only deploy when Foundry backend is configured (API must exist)
+resource resOpenAIDiagnosticLLMLogging 'Microsoft.ApiManagement/service/apis/diagnostics@2024-06-01-preview' = if (!empty(parFoundryEndpoint)) {
   name: '${parApimName}/openai/applicationinsights'
   dependsOn: [
     modApimApi
@@ -218,8 +221,17 @@ resource resOpenAIDiagnosticLLMLogging 'Microsoft.ApiManagement/service/apis/dia
   }
 }
 
+// Reference deployed APIM to get private IP (only available after deployment)
+resource resApim 'Microsoft.ApiManagement/service@2024-05-01' existing = {
+  name: parApimName
+  dependsOn: [
+    modApim
+  ]
+}
+
 // Outputs
 output resourceId string = modApim.outputs.resourceId
 output name string = modApim.outputs.name
 output gatewayUrl string = 'https://${modApim.outputs.name}.azure-api.net'
 output systemAssignedMIPrincipalId string = modApim.outputs.systemAssignedMIPrincipalId!
+output privateIpAddress string = resApim.properties.privateIPAddresses[0]

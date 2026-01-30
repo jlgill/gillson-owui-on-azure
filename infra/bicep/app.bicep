@@ -14,6 +14,9 @@ param parHubResourceGroupName string
 param parHubVirtualNetworkName string
 param parCustomDomain string
 param parCertificateName string
+@description('Name of the APIM instance in the hub resource group.')
+@minLength(3)
+@maxLength(21)
 param parApimName string = 'apim-open-webui'
 @secure()
 param parCertificatePfxBase64 string = ''
@@ -33,6 +36,9 @@ param parContainerAppAllowedIpAddresses array = []
 param parContainerAppScaleSettings object
 param parFoundryDeployments FoundryDeploymentType[]
 param parTags TagsType
+@description('Prefix used to name resources. Max 14 chars to allow room for suffixes and uniqueString (e.g., "-kv", "-sa", 13-char unique suffix). Total name must stay within Azure limits.')
+@minLength(3)
+@maxLength(14)
 param parNamePrefix string = 'open-webui-app'
 
 // MARK: - Existing Hub Resources
@@ -69,9 +75,24 @@ resource resPostgresDnsZone 'Microsoft.Network/privateDnsZones@2024-06-01' exist
 }
 
 // Variables
+// Generate a unique suffix using subscription and resource group to prevent naming collisions for globally-namespaced resources
+// This ensures resources like Storage Accounts and Key Vaults are unique across all Azure tenants
+// Note: Using parResourceGroupName instead of resourceGroup().name because this file has subscription scope
+var varUniqueSuffix = uniqueString(subscription().subscriptionId, parResourceGroupName)
+
 var varOpenWebUiShare = 'open-webui-share'
 var varAppRegistrationName = 'app-open-webui'
-var varPostgresServerName = '${parNamePrefix}-psql'
+
+// PostgreSQL server names must be globally unique (3-63 chars, lowercase alphanumeric and hyphens)
+var varPostgresServerName = '${parNamePrefix}-psql-${varUniqueSuffix}'
+
+// Storage Account names must be globally unique (3-24 chars, lowercase alphanumeric only)
+// Using take() to enforce max length: prefix (up to 14) + 'sa' (2) + unique suffix (8 chars from uniqueString) = max 24
+var varStorageAccountName = take(toLower(replace('${parNamePrefix}sa${varUniqueSuffix}', '-', '')), 24)
+
+// Key Vault names must be globally unique (3-24 chars, alphanumeric and hyphens)
+// Using take() to enforce max length: prefix (up to 14) + '-kv-' (4) + unique suffix (6 chars) = max 24
+var varKeyVaultName = take('${parNamePrefix}-kv-${varUniqueSuffix}', 24)
 var varIpSecurityRestrictions = [for ip in parContainerAppAllowedIpAddresses: {
   name: 'allow-${replace(ip, '/', '-')}'
   ipAddressRange: ip
@@ -236,6 +257,7 @@ module modVirtualNetwork 'br/public:avm/res/network/virtual-network:0.7.1' = {
         serviceEndpoints: [
           'Microsoft.Storage'
         ]
+        delegation: 'Microsoft.App/environments'
       }
     ]
     // Spoke to Hub VNet peering
@@ -288,7 +310,7 @@ module modAppInsights 'br/public:avm/res/insights/component:0.7.1' = {
 module modKeyVault 'br/public:avm/res/key-vault/vault:0.13.3' = {
   scope: resourceGroup(parResourceGroupName)
   params: {
-    name: '${parNamePrefix}-kv'
+    name: varKeyVaultName
     location: parLocation
     sku: 'standard'
     enablePurgeProtection: false
@@ -310,7 +332,7 @@ module modKeyVault 'br/public:avm/res/key-vault/vault:0.13.3' = {
 module modStorageAccount 'br/public:avm/res/storage/storage-account:0.29.0' = {
   scope: resourceGroup(parResourceGroupName)
   params: {
-    name: replace('${parNamePrefix}sa', '-', '')
+    name: varStorageAccountName
     location: parLocation
     skuName: 'Standard_LRS'
     kind: 'StorageV2'
@@ -464,6 +486,7 @@ module modContainerAppEnv 'br/public:avm/res/app/managed-environment:0.11.3' = {
     location: parLocation
     appInsightsConnectionString: modAppInsights.outputs.connectionString
     publicNetworkAccess: 'Disabled'
+    zoneRedundant: false // Zone redundancy not supported in all regions (e.g., westus)
     storages: [
       {
         kind: 'SMB'

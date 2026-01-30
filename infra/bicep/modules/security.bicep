@@ -9,6 +9,14 @@ param parTrustedRootCertificateBase64 string
 param parCustomDomain string
 
 // Variables
+// Generate a unique suffix for globally-namespaced resources like Key Vault
+// This ensures the Key Vault name is unique across all Azure tenants
+var varUniqueSuffix = uniqueString(subscription().subscriptionId, resourceGroup().name)
+
+// Key Vault names must be globally unique (3-24 chars, alphanumeric and hyphens)
+// Using take() to enforce max length: 'kv-' (3) + app gateway name (up to 21) = max 24 with room for unique suffix
+var varHubKeyVaultName = take('kv-${parAppGatewayName}-${varUniqueSuffix}', 24)
+
 var varRoleDefinitions = {
   keyVaultSecretsUser: '4633458b-17de-408a-b874-0445c86b69e6'
 }
@@ -24,7 +32,7 @@ module modAppGatewayIdentity 'br/public:avm/res/managed-identity/user-assigned-i
 // Key Vault for Hub certificates
 module modHubKeyVault 'br/public:avm/res/key-vault/vault:0.13.3' = if (!empty(parCustomDomain)) {
   params: {
-    name: 'kv-${parAppGatewayName}'
+    name: varHubKeyVaultName
     location: parLocation
     sku: 'standard'
     enableRbacAuthorization: true
@@ -40,14 +48,18 @@ module modHubKeyVault 'br/public:avm/res/key-vault/vault:0.13.3' = if (!empty(pa
 }
 
 // RBAC for App Gateway to access Hub Key Vault
-resource resHubKeyVault 'Microsoft.KeyVault/vaults@2023-07-01' existing = if (!empty(parCustomDomain)) {
-  name: 'kv-${parAppGatewayName}'
-}
-
+// Note: Using dependsOn ensures the Key Vault exists before role assignment
+// principalType: 'ServicePrincipal' avoids replication delay errors for managed identities
 module modAppGatewayKeyVaultRbac 'br/public:avm/ptn/authorization/resource-role-assignment:0.1.2' = if (!empty(parCustomDomain)) {
+  name: 'modAppGatewayKeyVaultRbac-${uniqueString(deployment().name)}'
+  dependsOn: [
+    modHubKeyVault
+    modAppGatewayIdentity
+  ]
   params: {
     principalId: modAppGatewayIdentity!.outputs.principalId
-    resourceId: resHubKeyVault.id
+    principalType: 'ServicePrincipal'
+    resourceId: modHubKeyVault!.outputs.resourceId
     roleDefinitionId: varRoleDefinitions.keyVaultSecretsUser
   }
 }

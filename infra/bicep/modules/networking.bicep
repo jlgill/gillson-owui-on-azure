@@ -117,13 +117,19 @@ module modApimPrivateDnsZone 'br/public:avm/res/network/private-dns-zone:0.8.0' 
   params: {
     name: 'azure-api.net'
     location: 'global'
-    virtualNetworkLinks: [
+    // Only link to spoke VNet when it exists (not on first deployment)
+    virtualNetworkLinks: !empty(parSpokeVirtualNetworkName) ? [
       {
         virtualNetworkResourceId: modVirtualNetwork.outputs.resourceId
         registrationEnabled: false
       }
       {
         virtualNetworkResourceId: resourceId(subscription().subscriptionId, parSpokeResourceGroupName, 'Microsoft.Network/virtualNetworks', parSpokeVirtualNetworkName)
+        registrationEnabled: false
+      }
+    ] : [
+      {
+        virtualNetworkResourceId: modVirtualNetwork.outputs.resourceId
         registrationEnabled: false
       }
     ]

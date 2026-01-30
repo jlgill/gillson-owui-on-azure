@@ -4,12 +4,21 @@ extension 'br:mcr.microsoft.com/bicep/extensions/microsoftgraph/v1.0:1.0.0'
 
 // ========== Type Imports ==========
 import { TagsType } from './shared/types.bicep'
+// Import placeholder marker for detecting first deployment (before Step 2 outputs are available)
+import { placeholderMarker } from './shared/config.bicep'
 
 // ========== MARK: Parameters ==========
 param parLocation string
 param parResourceGroupName string
+@description('Name of the Application Gateway. Must be 3-21 chars for combined naming with identity suffix.')
+@minLength(3)
+@maxLength(21)
 param parAppGatewayName string
+@description('Name of the API Management instance. Must be globally unique. Consider adding a unique suffix if deployment fails due to naming conflict.')
+@minLength(3)
+@maxLength(21)
 param parApimName string
+@description('APIM publisher email - must be a valid email address, not the placeholder.')
 param parApimPublisherEmail string
 param parApimPublisherName string
 param parVirtualNetworkName string
@@ -20,37 +29,69 @@ param parPeSubnetAddressPrefix string
 param parApimSku string
 param parAppGatewaySku string
 param parSpokeResourceGroupName string
-param parSpokeVirtualNetworkName string
-@validate(
-  x => !contains(x, 'https://'), 'The Container App param FQDN must not contain the "https://" prefix.'
-)
+
+@description('Name prefix used in spoke deployment. Used to auto-derive spoke resource names. Must match parNamePrefix in app.bicepparam.')
+@minLength(3)
+@maxLength(14)
+param parSpokeNamePrefix string = 'open-webui-app'
+
+@description('Container App FQDN from app.bicep output. Set to placeholder on first deploy, update after Step 2.')
+@metadata({
+  example: 'open-webui-app-aca.jollyfield-adf491b7.uksouth.azurecontainerapps.io'
+})
 param parContainerAppFqdn string
+
+@description('Container App static IP from app.bicep output. Set to placeholder on first deploy, update after Step 2.')
+@metadata({
+  example: '10.0.4.91'
+})
 param parContainerAppStaticIp string
+
 param parCustomDomain string
-param parSpokeKeyVaultName string
 param parTrustedRootCertificateSecretName string
 param parSslCertificateSecretName string
 param parTags TagsType
+
+@description('Entra ID App Registration ID from app.bicep output (outOpenWebUIAppId). Required for APIM token validation.')
 param parOpenWebUIAppId string = ''
-param parFoundryName string = 'open-webui-app-foundry'
+
 param parConfigureFoundry bool = false
 
 
 // ========== MARK: Variables ==========
 var varOpenWebUi = 'open-webui'
 var varNsgRules = loadJsonContent('./shared/nsg-rules.json')
-var varContainerAppEnvDefaultDomain = !empty(parContainerAppFqdn) ? join(skip(split(parContainerAppFqdn, '.'), 1), '.') : ''
-var varContainerAppName = !empty(parContainerAppFqdn) ? split(parContainerAppFqdn, '.')[0] : ''
 var varTrustedRootCertificateBase64 = loadTextContent('./cert/cloudflare-origin-ca.cer')
 var varRoleDefinitions = {
   keyVaultSecretsUser: '4633458b-17de-408a-b874-0445c86b69e6'
 }
 
+// ========== Auto-Derived Names ==========
+// These are calculated from parSpokeNamePrefix to ensure consistency with app.bicep
+// No need to manually specify these - they follow the same naming convention as the spoke deployment
+
+// Spoke VNet name follows pattern: ${parSpokeNamePrefix}-vnet
+var varSpokeVirtualNetworkName = '${parSpokeNamePrefix}-vnet'
+
+// Foundry name follows pattern: ${parSpokeNamePrefix}-foundry
+var varFoundryName = '${parSpokeNamePrefix}-foundry'
+
+// Spoke Key Vault name uses uniqueString for global uniqueness (same logic as app.bicep)
+// Pattern: take('${parSpokeNamePrefix}-kv-${uniqueString}', 24)
+var varSpokeUniqueSuffix = uniqueString(subscription().subscriptionId, parSpokeResourceGroupName)
+var varSpokeKeyVaultName = take('${parSpokeNamePrefix}-kv-${varSpokeUniqueSuffix}', 24)
+
+// ========== Placeholder Detection ==========
+// Detect if Step 2 outputs haven't been provided yet (first hub deployment)
+var varIsFirstDeployment = parContainerAppFqdn == placeholderMarker || parContainerAppStaticIp == placeholderMarker
+var varContainerAppEnvDefaultDomain = !varIsFirstDeployment && !empty(parContainerAppFqdn) ? join(skip(split(parContainerAppFqdn, '.'), 1), '.') : ''
+var varContainerAppName = !varIsFirstDeployment && !empty(parContainerAppFqdn) ? split(parContainerAppFqdn, '.')[0] : ''
+
 // Reference existing Foundry in spoke to get its endpoint dynamically
 // Only reference when parConfigureFoundry is true (second hub deployment)
 resource resFoundryExisting 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = if (parConfigureFoundry) {
   scope: resourceGroup(parSpokeResourceGroupName)
-  name: parFoundryName
+  name: varFoundryName
 }
 
 // Public IP configurations for loop deployment
@@ -88,10 +129,11 @@ module modNetworking 'modules/networking.bicep' = {
     parAppGatewaySubnetAddressPrefix: parAppGatewaySubnetAddressPrefix
     parPeSubnetAddressPrefix: parPeSubnetAddressPrefix
     parSpokeResourceGroupName: parSpokeResourceGroupName
-    parSpokeVirtualNetworkName: parSpokeVirtualNetworkName
+    // Only pass spoke VNet name when NOT first deployment (spoke must exist for peering)
+    parSpokeVirtualNetworkName: varIsFirstDeployment ? '' : varSpokeVirtualNetworkName
     parContainerAppEnvDefaultDomain: varContainerAppEnvDefaultDomain
     parContainerAppName: varContainerAppName
-    parContainerAppStaticIp: parContainerAppStaticIp
+    parContainerAppStaticIp: varIsFirstDeployment ? '' : parContainerAppStaticIp
     parNsgRules: varNsgRules
   }
   dependsOn: [modResourceGroup]
@@ -121,11 +163,13 @@ module modSecurity 'modules/security.bicep' = {
 }
 
 // MARK: - RBAC for Spoke Key Vault
-module modAppGatewaySpokeKeyVaultRbac 'br/public:avm/ptn/authorization/resource-role-assignment:0.1.2' = if (!empty(parCustomDomain) && !empty(parSpokeKeyVaultName)) {
+// Uses auto-derived Key Vault name based on parSpokeNamePrefix
+// Only creates RBAC after spoke exists (not on first deployment)
+module modAppGatewaySpokeKeyVaultRbac 'br/public:avm/ptn/authorization/resource-role-assignment:0.1.2' = if (!empty(parCustomDomain) && !varIsFirstDeployment) {
   scope: resourceGroup(parSpokeResourceGroupName)
   params: {
     principalId: modSecurity.outputs.userAssignedIdentityPrincipalId
-    resourceId: resourceId(subscription().subscriptionId, parSpokeResourceGroupName, 'Microsoft.KeyVault/vaults', parSpokeKeyVaultName)
+    resourceId: resourceId(subscription().subscriptionId, parSpokeResourceGroupName, 'Microsoft.KeyVault/vaults', varSpokeKeyVaultName)
     roleDefinitionId: varRoleDefinitions.keyVaultSecretsUser
   }
 }
@@ -148,15 +192,17 @@ module modPublicIps 'br/public:avm/res/network/public-ip-address:0.8.0' = [for c
 }]
 
 // MARK: - Application Gateway
+// Only fully configure when spoke exists (not first deployment)
 module modAppGateway 'modules/app-gateway.bicep' = {
   scope: resourceGroup(parResourceGroupName)
   params: {
     parAppGatewayName: parAppGatewayName
     parLocation: parLocation
     parSku: parAppGatewaySku
-    parContainerAppFqdn: parContainerAppFqdn
+    parContainerAppFqdn: varIsFirstDeployment ? '' : parContainerAppFqdn
     parCustomDomain: parCustomDomain
-    parSpokeKeyVaultName: parSpokeKeyVaultName
+    // Only pass spoke Key Vault name when NOT first deployment (spoke must exist for SSL cert)
+    parSpokeKeyVaultName: varIsFirstDeployment ? '' : varSpokeKeyVaultName
     parTrustedRootCertificateSecretName: parTrustedRootCertificateSecretName
     parSslCertificateSecretName: parSslCertificateSecretName
     parAppGatewaySubnetId: modNetworking.outputs.appGatewaySubnetResourceId
@@ -217,11 +263,7 @@ module modApimFoundryAzureAIUserRbac 'br/public:avm/ptn/authorization/resource-r
 }
 
 // MARK: - APIM Private DNS A Record
-// Get existing APIM resource to read its private IP
-resource resApimExisting 'Microsoft.ApiManagement/service@2023-05-01-preview' existing = {
-  scope: resourceGroup(parResourceGroupName)
-  name: parApimName
-}
+// Uses the private IP from the APIM module output
 
 module modApimDnsRecord 'br/public:avm/res/network/private-dns-zone:0.8.0' = {
   scope: resourceGroup(parResourceGroupName)
@@ -233,7 +275,7 @@ module modApimDnsRecord 'br/public:avm/res/network/private-dns-zone:0.8.0' = {
         name: parApimName
         ttl: 3600
         aRecords: [
-          { ipv4Address: resApimExisting.properties.privateIPAddresses[0] }
+          { ipv4Address: modApim.outputs.privateIpAddress }
         ]
       }
     ]
@@ -247,8 +289,49 @@ output outApimGatewayUrl string = modApim.outputs.gatewayUrl
 output outApimSystemAssignedPrincipalId string = modApim.outputs.systemAssignedMIPrincipalId
 output outAppInsightsConnectionString string = modMonitoring.outputs.appInsightsConnectionString
 output outAppInsightsResourceId string = modMonitoring.outputs.appInsightsResourceId
-output outAppGatewayPublicIp string = modPublicIps[0].outputs.resourceId
+output outAppGatewayPublicIp string = modPublicIps[0].outputs.ipAddress
+output outAppGatewayPublicIpResourceId string = modPublicIps[0].outputs.resourceId
 output outApimPublicIp string = modPublicIps[1].outputs.ipAddress
 output outVirtualNetworkResourceId string = modNetworking.outputs.virtualNetworkResourceId
 output outVirtualNetworkName string = modNetworking.outputs.virtualNetworkName
 output outContainerAppFqdn string = parContainerAppFqdn
+
+// ========== Deployment Summary ==========
+// Provides helpful information about what was deployed and next steps
+
+output outDeploymentSummary object = {
+  deploymentType: varIsFirstDeployment ? 'Initial Hub (Step 1)' : (parConfigureFoundry ? 'Final Hub with Foundry (Step 3)' : 'Hub Update (Step 3)')
+  resourceGroup: parResourceGroupName
+  customDomain: parCustomDomain
+  
+  // Key resource info
+  resources: {
+    appGatewayPublicIp: modPublicIps[0].outputs.ipAddress
+    apimGatewayUrl: modApim.outputs.gatewayUrl
+    apimName: parApimName
+    hubVnetName: parVirtualNetworkName
+  }
+  
+  // Auto-derived spoke names (for reference)
+  derivedSpokeNames: {
+    spokeVirtualNetworkName: varSpokeVirtualNetworkName
+    spokeKeyVaultName: varSpokeKeyVaultName
+    foundryName: varFoundryName
+  }
+  
+  // Next steps based on deployment stage
+  nextSteps: varIsFirstDeployment ? [
+    '1. Deploy app.bicep (Step 2) to create spoke infrastructure'
+    '2. Note the outputs: outContainerAppFqdn, outContainerAppEnvStaticIp, outOpenWebUIAppId'
+    '3. Grant admin consent in Entra ID for app-open-webui'
+    '4. Update main.bicepparam with spoke outputs and set parConfigureFoundry=true'
+    '5. Redeploy main.bicep (Step 3)'
+  ] : parConfigureFoundry ? [
+    'Deployment complete! Final steps:'
+    '1. Configure DNS A record: ${parCustomDomain} → ${modPublicIps[0].outputs.ipAddress}'
+    '2. Import OpenAPI spec: az apim api import --resource-group ${parResourceGroupName} --service-name ${parApimName} --api-id openai --path "openai/v1" --specification-format OpenApiJson --specification-path infra/bicep/openapi/openai.openapi.json'
+    '3. If using Cloudflare: Enable proxy and set SSL/TLS to Full (strict)'
+  ] : [
+    'Hub updated. If spoke is deployed, set parConfigureFoundry=true and redeploy.'
+  ]
+}
