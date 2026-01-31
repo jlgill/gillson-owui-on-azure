@@ -10,6 +10,7 @@
         <validate-azure-ad-token tenant-id="{{tenant-id}}">
             <audiences>
                 <audience>{{openwebui-app-id}}</audience>
+                <audience>api://app-open-webui</audience>
             </audiences>
             <required-claims>
                 <claim name="roles" match="any">

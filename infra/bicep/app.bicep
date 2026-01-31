@@ -487,6 +487,12 @@ module modContainerAppEnv 'br/public:avm/res/app/managed-environment:0.11.3' = {
     appInsightsConnectionString: modAppInsights.outputs.connectionString
     publicNetworkAccess: 'Disabled'
     zoneRedundant: false // Zone redundancy not supported in all regions (e.g., westus)
+    workloadProfiles: [
+      {
+        name: 'Consumption'
+        workloadProfileType: 'Consumption'
+      }
+    ]
     storages: [
       {
         kind: 'SMB'

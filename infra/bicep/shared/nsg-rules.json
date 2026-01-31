@@ -42,6 +42,20 @@
     }
   },
   {
+    "name": "Allow-Inbound-VirtualNetwork-Https",
+    "properties": {
+      "access": "Allow",
+      "priority": 125,
+      "direction": "Inbound",
+      "sourceAddressPrefix": "VirtualNetwork",
+      "sourcePortRange": "*",
+      "destinationAddressPrefix": "VirtualNetwork",
+      "destinationPortRange": "443",
+      "protocol": "Tcp",
+      "description": "Allow HTTPS traffic from VNet (Container Apps to APIM)"
+    }
+  },
+  {
     "name": "Allow-Outbound-AzureStorage",
     "properties": {
       "access": "Allow",
