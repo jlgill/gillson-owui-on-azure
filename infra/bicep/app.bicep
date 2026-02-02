@@ -576,7 +576,7 @@ module modContainerApp 'br/public:avm/res/app/container-app:0.19.0' = {
           }
           {
             name: 'OAUTH_SCOPES'
-            value: 'openid email profile api://${varAppRegistrationName}/user_impersonation User.Read GroupMember.Read.All ProfilePhoto.Read.All'
+            value: 'openid email profile offline_access api://${varAppRegistrationName}/user_impersonation User.Read GroupMember.Read.All ProfilePhoto.Read.All'
           }
           {
             name: 'OPENID_PROVIDER_URL'

@@ -87,6 +87,39 @@ The deployment is **sequential and stateful** - outputs from one step become inp
 2. **Step 2**: Deploy spoke (`app.bicep`) → creates Foundry, ACA, PostgreSQL, Entra app
 3. **Step 3**: Redeploy hub with spoke outputs + `parConfigureFoundry=true` → configures APIM backend, VNet peering, RBAC
 
+## Deployment Commands (CRITICAL)
+
+**Always use unique deployment names** with the `--name` parameter to avoid conflicts with in-progress or existing deployments. Use a timestamp or descriptive suffix.
+
+### Hub Deployment (main.bicep)
+```powershell
+# Initial hub deployment (Step 1)
+az deployment sub create `
+  --location westus `
+  --name "hub-$(Get-Date -Format 'yyyyMMdd-HHmmss')" `
+  --template-file .\infra\bicep\main.bicep `
+  --parameters .\infra\bicep\main.bicepparam
+
+# Hub redeploy after spoke (Step 3)
+az deployment sub create `
+  --location westus `
+  --name "hub-configure-$(Get-Date -Format 'yyyyMMdd-HHmmss')" `
+  --template-file .\infra\bicep\main.bicep `
+  --parameters .\infra\bicep\main.bicepparam
+```
+
+### Spoke Deployment (app.bicep)
+```powershell
+# Spoke deployment (Step 2)
+az deployment sub create `
+  --location westus `
+  --name "spoke-$(Get-Date -Format 'yyyyMMdd-HHmmss')" `
+  --template-file .\infra\bicep\app.bicep `
+  --parameters .\infra\bicep\app.bicepparam
+```
+
+> **⚠️ Important**: Without unique `--name` values, deployments may fail with "deployment already exists" errors if a previous deployment with the same name is still running or recently completed.
+
 ## Key Patterns
 
 ### Shared Configuration
