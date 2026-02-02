@@ -156,6 +156,22 @@ import { FoundryDeploymentType, PostgresConfigType, TagsType } from './shared/ty
 - **Naming**: 3-24 chars for Key Vault, 3-21 chars for APIM/AppGW, use `uniqueString()` for global uniqueness
 - **MARK comments**: Use `// MARK: - Section Name` for code organization
 
+### Azure Service Lifecycle
+
+**Before adding Azure resources**, always verify the service is not deprecated or retired:
+
+1. **Check [Azure Updates](https://azure.microsoft.com/en-us/updates/?query=retirement)** - Filter by "Retirements" to see scheduled service deprecations
+2. **Check the [Azure Retirement Workbook](https://aka.ms/ServicesRetirementWorkbook)** - Shows retirements affecting your subscriptions
+3. **Check [Azure service lifecycle documentation](https://learn.microsoft.com/en-us/lifecycle/products/?terms=azure)** - Official lifecycle status
+
+> **⚠️ Lesson Learned**: Bing Search APIs (`Microsoft.Bing/accounts`) were retired August 11, 2025. Always verify service availability before implementing Azure resource types, especially those without published Bicep/ARM schemas.
+
+**Red flags that a service may be deprecated:**
+- No published ARM/Bicep schema (requires `#disable-next-line BCP081`)
+- Limited recent documentation updates
+- Microsoft recommending alternative services
+- "Preview" services older than 2 years without GA announcement
+
 ## APIM Policies
 
 Policies in [infra/bicep/policies/](infra/bicep/policies/) use:
