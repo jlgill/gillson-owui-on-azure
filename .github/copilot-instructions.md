@@ -266,6 +266,101 @@ param parFoundryDeployments = [{
 - `.bicepparam` resource-specific values → update `shared/config.bicep` instead
 - SSL certificates in `infra/bicep/cert/` → use `create-origin-cert.ps1` script
 
+## Azure Resource Reference
+
+Use these values when debugging or querying Azure resources:
+
+| Resource | Value |
+|----------|-------|
+| **Subscription ID** | `1abe24d3-1140-4570-a5a3-64dbaa62fc93` |
+| **Subscription Name** | Personal Azure Subscription |
+| **Tenant ID** | `1b4ec955-c987-44c3-a62f-d1cd054d1ddc` |
+| **Spoke Resource Group** | `rg-owui-app` |
+| **Container App Name** | `owui-app-aca` |
+| **Container App Environment** | `owuiappacaenv` |
+| **Log Analytics Workspace** | `owui-app-law` |
+| **Custom Domain** | `openwebui.gillson.us` |
+
+## Container App Debugging
+
+### Quick Health Check
+
+Check if the container is running:
+```bash
+az containerapp show --name owui-app-aca --resource-group rg-owui-app \
+  --subscription 1abe24d3-1140-4570-a5a3-64dbaa62fc93 \
+  --query "{status: properties.runningStatus, revision: properties.latestRevisionName, replicas: properties.template.scale}"
+```
+
+### Real-Time Log Streaming
+
+**Console logs** (application output):
+```bash
+az containerapp logs show --name owui-app-aca --resource-group rg-owui-app \
+  --subscription 1abe24d3-1140-4570-a5a3-64dbaa62fc93 \
+  --type console --follow --tail 100
+```
+
+**System logs** (container lifecycle events):
+```bash
+az containerapp logs show --name owui-app-aca --resource-group rg-owui-app \
+  --subscription 1abe24d3-1140-4570-a5a3-64dbaa62fc93 \
+  --type system --follow --tail 50
+```
+
+### Common Container App Issues
+
+#### Container Crash Loop (cgroup errors)
+
+**Symptom**: `ContainerCreateFailure` with `Invalid argument : sys/fs/cgroup/cpu/default/cpu_cfs_quota_us`
+
+**Cause**: CPU resource allocation too low (e.g., 0.5 cores)
+
+**Fix**: Increase CPU to at least 1.0 core:
+```bash
+az containerapp update --name owui-app-aca --resource-group rg-owui-app \
+  --subscription 1abe24d3-1140-4570-a5a3-64dbaa62fc93 \
+  --cpu 1.0 --memory 2Gi
+```
+
+#### Startup Probe Failures
+
+**Symptom**: Repeated `ProbeFailed` events in system logs
+
+**Cause**: Container taking too long to start, or health endpoint not responding
+
+**Fix**: Check console logs for startup errors, verify database connectivity, increase probe timeout if needed
+
+#### Resource Configuration
+
+Check current resources:
+```bash
+az containerapp show --name owui-app-aca --resource-group rg-owui-app \
+  --subscription 1abe24d3-1140-4570-a5a3-64dbaa62fc93 \
+  --query "properties.template.containers[0].resources"
+```
+
+Recommended minimum for Open WebUI:
+- **CPU**: 1.0 cores
+- **Memory**: 2Gi
+- **Ephemeral Storage**: 4Gi (auto-scales with memory)
+
+### Revision Management
+
+List all revisions:
+```bash
+az containerapp revision list --name owui-app-aca --resource-group rg-owui-app \
+  --subscription 1abe24d3-1140-4570-a5a3-64dbaa62fc93 \
+  --query "[].{name:name, active:properties.active, created:properties.createdTime}" -o table
+```
+
+Restart the container (creates new replica):
+```bash
+az containerapp revision restart --name owui-app-aca --resource-group rg-owui-app \
+  --subscription 1abe24d3-1140-4570-a5a3-64dbaa62fc93 \
+  --revision <revision-name>
+```
+
 ## Log Locations
 
 | Log Type | Workspace | Table |

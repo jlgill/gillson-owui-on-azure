@@ -92,6 +92,11 @@ var sharedConfig = {
     Environment: 'Demo'
     Owner: 'James Gil'
   }
+  
+  documentIntelligence: {
+    model: 'prebuilt-read'
+    sku: 'S0'
+  }
 }
 
 // ========== Derived Names (auto-calculated) ==========
