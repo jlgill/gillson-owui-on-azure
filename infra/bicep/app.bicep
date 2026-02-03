@@ -41,6 +41,8 @@ param parTags TagsType
 @minLength(3)
 @maxLength(14)
 param parNamePrefix string = 'open-webui-app'
+@description('Timestamp for OAuth client secret expiration calculation. Do not modify - auto-populated at deployment time.')
+param parDeploymentTimestamp string = utcNow()
 
 // MARK: - Existing Hub Resources
 // Reference hub VNet and PE subnet
@@ -213,6 +215,13 @@ resource resEntraIdApp 'Microsoft.Graph/applications@v1.0' = {
           type: 'Scope'
         }
       ]
+    }
+  ]
+  // Client secret for OAuth token refresh (required by Azure AD for confidential clients)
+  passwordCredentials: [
+    {
+      displayName: 'OAuth Client Secret'
+      endDateTime: dateTimeAdd(parDeploymentTimestamp, 'P2Y') // 2 year expiration
     }
   ]
 }
@@ -457,6 +466,17 @@ module modPostgresConnectionStringSecret 'br/public:avm/res/key-vault/vault/secr
   }
 }
 
+// MARK: - OAuth Client Secret in Key Vault
+module modOAuthClientSecret 'br/public:avm/res/key-vault/vault/secret:0.1.0' = {
+  scope: resourceGroup(parResourceGroupName)
+  name: 'oauth-client-secret'
+  params: {
+    keyVaultName: modKeyVault.outputs.name
+    name: 'oauth-client-secret'
+    value: resEntraIdApp.passwordCredentials[0].secretText
+  }
+}
+
 // MARK: - Container App Environment Managed Identity
 module modEnvIdentity 'br/public:avm/res/managed-identity/user-assigned-identity:0.4.1' = {
   scope: resourceGroup(parResourceGroupName)
@@ -566,6 +586,10 @@ module modContainerApp 'br/public:avm/res/app/container-app:0.19.0' = {
           {
             name: 'OAUTH_CLIENT_ID'
             value: resEntraIdApp.appId
+          }
+          {
+            name: 'OAUTH_CLIENT_SECRET'
+            secretRef: 'oauth-client-secret'
           }
           {
             name: 'OAUTH_CODE_CHALLENGE_METHOD'
@@ -747,6 +771,11 @@ module modContainerApp 'br/public:avm/res/app/container-app:0.19.0' = {
       {
         name: 'database-url'
         keyVaultUrl: '${modKeyVault.outputs.uri}secrets/postgres-connection-string'
+        identity: 'System'
+      }
+      {
+        name: 'oauth-client-secret'
+        keyVaultUrl: '${modKeyVault.outputs.uri}secrets/oauth-client-secret'
         identity: 'System'
       }
     ]
