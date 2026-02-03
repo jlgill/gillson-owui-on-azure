@@ -87,6 +87,39 @@ The deployment is **sequential and stateful** - outputs from one step become inp
 2. **Step 2**: Deploy spoke (`app.bicep`) → creates Foundry, ACA, PostgreSQL, Entra app
 3. **Step 3**: Redeploy hub with spoke outputs + `parConfigureFoundry=true` → configures APIM backend, VNet peering, RBAC
 
+## Deployment Commands (CRITICAL)
+
+**Always use unique deployment names** with the `--name` parameter to avoid conflicts with in-progress or existing deployments. Use a timestamp or descriptive suffix.
+
+### Hub Deployment (main.bicep)
+```powershell
+# Initial hub deployment (Step 1)
+az deployment sub create `
+  --location westus `
+  --name "hub-$(Get-Date -Format 'yyyyMMdd-HHmmss')" `
+  --template-file .\infra\bicep\main.bicep `
+  --parameters .\infra\bicep\main.bicepparam
+
+# Hub redeploy after spoke (Step 3)
+az deployment sub create `
+  --location westus `
+  --name "hub-configure-$(Get-Date -Format 'yyyyMMdd-HHmmss')" `
+  --template-file .\infra\bicep\main.bicep `
+  --parameters .\infra\bicep\main.bicepparam
+```
+
+### Spoke Deployment (app.bicep)
+```powershell
+# Spoke deployment (Step 2)
+az deployment sub create `
+  --location westus `
+  --name "spoke-$(Get-Date -Format 'yyyyMMdd-HHmmss')" `
+  --template-file .\infra\bicep\app.bicep `
+  --parameters .\infra\bicep\app.bicepparam
+```
+
+> **⚠️ Important**: Without unique `--name` values, deployments may fail with "deployment already exists" errors if a previous deployment with the same name is still running or recently completed.
+
 ## Key Patterns
 
 ### Shared Configuration
@@ -122,6 +155,22 @@ import { FoundryDeploymentType, PostgresConfigType, TagsType } from './shared/ty
 - **Graph extension**: Required for Entra app registration: `extension 'br:mcr.microsoft.com/bicep/extensions/microsoftgraph/v1.0:1.0.0'`
 - **Naming**: 3-24 chars for Key Vault, 3-21 chars for APIM/AppGW, use `uniqueString()` for global uniqueness
 - **MARK comments**: Use `// MARK: - Section Name` for code organization
+
+### Azure Service Lifecycle
+
+**Before adding Azure resources**, always verify the service is not deprecated or retired:
+
+1. **Check [Azure Updates](https://azure.microsoft.com/en-us/updates/?query=retirement)** - Filter by "Retirements" to see scheduled service deprecations
+2. **Check the [Azure Retirement Workbook](https://aka.ms/ServicesRetirementWorkbook)** - Shows retirements affecting your subscriptions
+3. **Check [Azure service lifecycle documentation](https://learn.microsoft.com/en-us/lifecycle/products/?terms=azure)** - Official lifecycle status
+
+> **⚠️ Lesson Learned**: Bing Search APIs (`Microsoft.Bing/accounts`) were retired August 11, 2025. Always verify service availability before implementing Azure resource types, especially those without published Bicep/ARM schemas.
+
+**Red flags that a service may be deprecated:**
+- No published ARM/Bicep schema (requires `#disable-next-line BCP081`)
+- Limited recent documentation updates
+- Microsoft recommending alternative services
+- "Preview" services older than 2 years without GA announcement
 
 ## APIM Policies
 

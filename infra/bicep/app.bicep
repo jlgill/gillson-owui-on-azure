@@ -452,7 +452,7 @@ module modPostgresConnectionStringSecret 'br/public:avm/res/key-vault/vault/secr
   params: {
     keyVaultName: modKeyVault.outputs.name
     name: 'postgres-connection-string'
-    value: 'postgresql://${parPostgresConfig.adminUsername}:${parPostgresAdminPassword}@${modPostgresServer.outputs.?fqdn ?? ''}:5432/${parPostgresConfig.databaseName}?sslmode=require'
+    value: 'postgresql://${parPostgresConfig.adminUsername}:${uriComponent(parPostgresAdminPassword)}@${modPostgresServer.outputs.?fqdn ?? ''}:5432/${parPostgresConfig.databaseName}?sslmode=require'
   }
 }
 
@@ -576,7 +576,7 @@ module modContainerApp 'br/public:avm/res/app/container-app:0.19.0' = {
           }
           {
             name: 'OAUTH_SCOPES'
-            value: 'openid email profile api://${varAppRegistrationName}/user_impersonation User.Read GroupMember.Read.All ProfilePhoto.Read.All'
+            value: 'openid email profile offline_access api://${varAppRegistrationName}/user_impersonation User.Read GroupMember.Read.All ProfilePhoto.Read.All'
           }
           {
             name: 'OPENID_PROVIDER_URL'
@@ -600,7 +600,7 @@ module modContainerApp 'br/public:avm/res/app/container-app:0.19.0' = {
           }
           {
             name: 'DATA_DIR'
-            value: '/app/data'
+            value: '/app/backend/data'
           }
           {
             name: 'WEBUI_NAME'
@@ -689,6 +689,14 @@ module modContainerApp 'br/public:avm/res/app/container-app:0.19.0' = {
           {
             name: 'DOCUMENT_INTELLIGENCE_MODEL'
             value: sharedConfig.documentIntelligence.model
+          // Web search configuration - DuckDuckGo (free, no API key required)
+          {
+            name: 'ENABLE_WEB_SEARCH'
+            value: 'true'
+          }
+          {
+            name: 'WEB_SEARCH_ENGINE'
+            value: 'duckduckgo'
           }
         ]
         volumeMounts: [
