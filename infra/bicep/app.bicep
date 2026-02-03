@@ -4,6 +4,7 @@ extension 'br:mcr.microsoft.com/bicep/extensions/microsoftgraph/v1.0:1.0.0'
 
 // ========== Type Imports ==========
 import { FoundryDeploymentType, PostgresConfigType, TagsType } from './shared/types.bicep'
+import { sharedConfig } from './shared/config.bicep'
 
 // ========== Parameters ==========
 param parLocation string
@@ -684,11 +685,12 @@ module modContainerApp 'br/public:avm/res/app/container-app:0.19.0' = {
           }
           {
             name: 'DOCUMENT_INTELLIGENCE_ENDPOINT'
-            value: 'https://${parSpokeNamePrefix}-docint-${varUniqueSuffix}.cognitiveservices.azure.com/'
+            value: 'https://${parNamePrefix}-docint-${varUniqueSuffix}.cognitiveservices.azure.com/'
           }
           {
             name: 'DOCUMENT_INTELLIGENCE_MODEL'
             value: sharedConfig.documentIntelligence.model
+          }
           // Web search configuration - DuckDuckGo (free, no API key required)
           {
             name: 'ENABLE_WEB_SEARCH'
@@ -815,25 +817,26 @@ module modFoundry 'br/public:avm/res/cognitive-services/account:0.14.0' = {
 // MARK: - Document Intelligence
 module modDocumentIntelligence 'br/public:avm/res/cognitive-services/account:0.10.1' = {
   name: 'documentIntelligenceDeployment'
-  scope: resResourceGroup
+  scope: resourceGroup(parResourceGroupName)
   params: {
-    name: '${parSpokeNamePrefix}-docint-${varUniqueSuffix}'
+    name: '${parNamePrefix}-docint-${varUniqueSuffix}'
     location: parLocation
     kind: 'FormRecognizer'
     sku: sharedConfig.documentIntelligence.sku
     publicNetworkAccess: 'Disabled'
     disableLocalAuth: false
+    customSubDomainName: '${parNamePrefix}-docint-${varUniqueSuffix}'
     managedIdentities: {
       systemAssigned: true
     }
     privateEndpoints: [
       {
-        name: '${parSpokeNamePrefix}-docint-pe'
-        subnetResourceId: modVnet.outputs.subnetResourceIds[indexOf(modVnet.outputs.subnetNames, 'pe-subnet')]
+        name: '${parNamePrefix}-docint-pe'
+        subnetResourceId: resHubPeSubnet.id
         privateDnsZoneGroup: {
           privateDnsZoneGroupConfigs: [
             {
-              privateDnsZoneResourceId: modPrivateDnsZoneCognitiveServices.outputs.resourceId
+              privateDnsZoneResourceId: resCognitiveServicesDnsZone.id
             }
           ]
         }
@@ -841,16 +844,13 @@ module modDocumentIntelligence 'br/public:avm/res/cognitive-services/account:0.1
     ]
     roleAssignments: [
       {
-        principalId: modContainerApp.outputs.systemAssignedMIPrincipalId
+        principalId: modContainerApp.outputs.systemAssignedMIPrincipalId!
         roleDefinitionIdOrName: 'Cognitive Services User'
         principalType: 'ServicePrincipal'
       }
     ]
     tags: parTags
   }
-  dependsOn: [
-    modContainerApp
-  ]
 }
 
 // MARK: - Outputs
