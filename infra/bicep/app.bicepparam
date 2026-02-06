@@ -50,38 +50,41 @@ param parContainerAppScaleSettings = {
 // Re-add models after getting access at https://aka.ms/oai/access
 // Model retirement dates: https://learn.microsoft.com/en-us/azure/ai-foundry/openai/concepts/model-retirements
 param parFoundryDeployments = [
-  // Currently deployed models
-  {
-    name: 'gpt-4o'
-    model: { format: 'OpenAI', name: 'gpt-4o', version: '2024-11-20' }
-    sku: { name: 'GlobalStandard', capacity: 20 }
-  }
+  // Cost-effective high-volume model - best for casual conversation
+  // Maximized to available quota limit (200 TPM)
   {
     name: 'gpt-4o-mini'
     model: { format: 'OpenAI', name: 'gpt-4o-mini', version: '2024-07-18' }
-    sku: { name: 'GlobalStandard', capacity: 20 }
+    sku: { name: 'GlobalStandard', capacity: 200 }
   }
-  // GPT-4.1 family (longer support window - retires no earlier than April 2026)
+  // Quality responses - quota limit: 50 TPM
+  {
+    name: 'gpt-4o'
+    model: { format: 'OpenAI', name: 'gpt-4o', version: '2024-11-20' }
+    sku: { name: 'GlobalStandard', capacity: 50 }
+  }
+  // Long context model (1M tokens) - quota limit: 50 TPM
   {
     name: 'gpt-4.1'
     model: { format: 'OpenAI', name: 'gpt-4.1', version: '2025-04-14' }
-    sku: { name: 'GlobalStandard', capacity: 20 }
+    sku: { name: 'GlobalStandard', capacity: 50 }
   }
+  // Lightweight long context
   {
     name: 'gpt-4.1-mini'
     model: { format: 'OpenAI', name: 'gpt-4.1-mini', version: '2025-04-14' }
-    sku: { name: 'GlobalStandard', capacity: 20 }
+    sku: { name: 'GlobalStandard', capacity: 200 }
   }
-  // Reasoning model
+  // Reasoning model - quota limit: 20 TPM (maxed out, request increase)
   {
     name: 'o3-mini'
     model: { format: 'OpenAI', name: 'o3-mini', version: '2025-01-31' }
     sku: { name: 'GlobalStandard', capacity: 20 }
   }
-  // GPT-5 family (advanced reasoning)
+  // Latest generation
   {
     name: 'gpt-5-mini'
     model: { format: 'OpenAI', name: 'gpt-5-mini', version: '2025-08-07' }
-    sku: { name: 'GlobalStandard', capacity: 20 }
+    sku: { name: 'GlobalStandard', capacity: 200 }
   }
 ]

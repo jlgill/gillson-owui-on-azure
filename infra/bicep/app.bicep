@@ -22,8 +22,10 @@ param parApimName string = 'apim-open-webui'
 @secure()
 param parCertificatePfxBase64 string = ''
 @secure()
-@description('PostgreSQL administrator password. Pass inline via CLI: --parameters parPostgresAdminPassword=\'YourSecurePassword\'')
+@description('PostgreSQL administrator password. Required ONLY for initial deployment or when changing PostgreSQL configuration. On subsequent deployments, omit this parameter to skip PostgreSQL provisioning (connection string already exists in Key Vault).')
 param parPostgresAdminPassword string = ''
+@description('Set to true ONLY on initial deployment to create the OAuth client secret. On subsequent deployments, leave as false to avoid Graph API errors (existing secrets cannot be reset declaratively).')
+param parCreateOAuthSecret bool = false
 @description('PostgreSQL Flexible Server configuration')
 param parPostgresConfig PostgresConfigType = {
   skuName: 'Standard_B1ms'
@@ -117,7 +119,9 @@ resource resEntraIdApp 'Microsoft.Graph/applications@v1.0' = {
   displayName: varAppRegistrationName
   uniqueName: varAppRegistrationName
   signInAudience: 'AzureADMyOrg'
-  isFallbackPublicClient: true
+  // Must be false for confidential client flow (client_secret + PKCE)
+  // Setting to true causes AADSTS700025: "Client is public so neither client_assertion nor client_secret should be presented"
+  isFallbackPublicClient: false
   groupMembershipClaims: 'SecurityGroup'
   identifierUris: ['api://${varAppRegistrationName}']
   owners: {
@@ -193,10 +197,10 @@ resource resEntraIdApp 'Microsoft.Graph/applications@v1.0' = {
       enableAccessTokenIssuance: true
     }
   }
+  // publicClient section intentionally empty - redirect URIs must be in web{} for confidential client flow
+  // Having URIs here causes AADSTS700025: "Client is public so neither client_assertion nor client_secret should be presented"
   publicClient: {
-    redirectUris: [
-      'https://${parCustomDomain}/oauth/oidc/callback'
-    ]
+    redirectUris: []
   }
   requiredResourceAccess: [
     {
@@ -217,13 +221,18 @@ resource resEntraIdApp 'Microsoft.Graph/applications@v1.0' = {
       ]
     }
   ]
-  // Client secret for OAuth token refresh (required by Azure AD for confidential clients)
-  passwordCredentials: [
-    {
-      displayName: 'OAuth Client Secret'
-      endDateTime: dateTimeAdd(parDeploymentTimestamp, 'P2Y') // 2 year expiration
-    }
-  ]
+  // IMPORTANT: passwordCredentials is managed declaratively by the Graph extension.
+  // Setting it to [] will DELETE all existing client secrets from the app registration.
+  // Only include this property when explicitly creating a new secret (parCreateOAuthSecret=true).
+  // When false, omit the property entirely so the Graph extension leaves existing secrets untouched.
+  passwordCredentials: parCreateOAuthSecret
+    ? [
+        {
+          displayName: 'OAuth Client Secret'
+          endDateTime: dateTimeAdd(parDeploymentTimestamp, 'P2Y') // 2 year expiration
+        }
+      ]
+    : null
 }
 
 // MARK: - Entra ID Service Principal
@@ -413,7 +422,7 @@ module modDnsZoneLinks 'br/public:avm/res/network/private-dns-zone:0.8.0' = [for
 }]
 
 // MARK: - PostgreSQL Flexible Server
-module modPostgresServer 'br/public:avm/res/db-for-postgre-sql/flexible-server:0.15.1' = {
+module modPostgresServer 'br/public:avm/res/db-for-postgre-sql/flexible-server:0.15.1' = if (!empty(parPostgresAdminPassword)) {
   scope: resourceGroup(parResourceGroupName)
   params: {
     name: varPostgresServerName
@@ -456,18 +465,21 @@ module modPostgresServer 'br/public:avm/res/db-for-postgre-sql/flexible-server:0
 }
 
 // MARK: - Store PostgreSQL Connection String in Key Vault
-module modPostgresConnectionStringSecret 'br/public:avm/res/key-vault/vault/secret:0.1.0' = {
+// Derive FQDN from conditional module output with null-safe fallback
+var varPostgresFqdn = modPostgresServer.?outputs.?fqdn ?? 'placeholder'
+module modPostgresConnectionStringSecret 'br/public:avm/res/key-vault/vault/secret:0.1.0' = if (!empty(parPostgresAdminPassword)) {
   scope: resourceGroup(parResourceGroupName)
   name: 'postgres-connection-string-secret'
   params: {
     keyVaultName: modKeyVault.outputs.name
     name: 'postgres-connection-string'
-    value: 'postgresql://${parPostgresConfig.adminUsername}:${uriComponent(parPostgresAdminPassword)}@${modPostgresServer.outputs.?fqdn ?? ''}:5432/${parPostgresConfig.databaseName}?sslmode=require'
+    value: 'postgresql://${parPostgresConfig.adminUsername}:${uriComponent(parPostgresAdminPassword)}@${varPostgresFqdn}:5432/${parPostgresConfig.databaseName}?sslmode=require'
   }
 }
 
 // MARK: - OAuth Client Secret in Key Vault
-module modOAuthClientSecret 'br/public:avm/res/key-vault/vault/secret:0.1.0' = {
+// Only deploy when creating a new OAuth secret - on subsequent deployments, the secret already exists in Key Vault
+module modOAuthClientSecret 'br/public:avm/res/key-vault/vault/secret:0.1.0' = if (parCreateOAuthSecret) {
   scope: resourceGroup(parResourceGroupName)
   name: 'oauth-client-secret'
   params: {
