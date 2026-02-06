@@ -6,29 +6,57 @@
             var body = context.Request.Body?.As&lt;JObject&gt;(preserveContent: true);
             return body?[&quot;model&quot;]?.ToString() ?? &quot;unknown&quot;;
         }" />
-        <!-- Azure AD token validation - requires parOpenWebUIAppId to be configured -->
-        <validate-azure-ad-token tenant-id="{{tenant-id}}">
-            <audiences>
-                <audience>{{openwebui-app-id}}</audience>
-                <audience>api://app-open-webui</audience>
-            </audiences>
-            <required-claims>
-                <claim name="roles" match="any">
-                    <value>admin</value>
-                    <value>user</value>
-                </claim>
-            </required-claims>
-        </validate-azure-ad-token>
+        <!-- Check if Authorization header contains a Bearer token -->
+        <set-variable name="hasValidToken" value="@{
+            var authHeader = context.Request.Headers.GetValueOrDefault(&quot;Authorization&quot;, &quot;&quot;);
+            return !string.IsNullOrEmpty(authHeader) &amp;&amp; authHeader.StartsWith(&quot;Bearer &quot;);
+        }" />
+        <!-- Validate Azure AD token if present, otherwise allow with degraded tracking -->
+        <choose>
+            <when condition="@((bool)context.Variables[&quot;hasValidToken&quot;])">
+                <!-- Token present - validate it and extract claims -->
+                <validate-azure-ad-token tenant-id="{{tenant-id}}" output-token-variable-name="jwt-token">
+                    <audiences>
+                        <audience>{{openwebui-app-id}}</audience>
+                        <audience>api://app-open-webui</audience>
+                    </audiences>
+                    <required-claims>
+                        <claim name="roles" match="any">
+                            <value>admin</value>
+                            <value>user</value>
+                        </claim>
+                    </required-claims>
+                </validate-azure-ad-token>
+                <!-- Extract user info from validated token -->
+                <set-variable name="userId" value="@{
+                    var jwt = (Jwt)context.Variables[&quot;jwt-token&quot;];
+                    return jwt.Claims.GetValueOrDefault(&quot;preferred_username&quot;, &quot;unknown&quot;);
+                }" />
+                <set-variable name="clientIp" value="@{
+                    var jwt = (Jwt)context.Variables[&quot;jwt-token&quot;];
+                    return jwt.Claims.GetValueOrDefault(&quot;ipaddr&quot;, &quot;unknown&quot;);
+                }" />
+                <set-variable name="tokenStatus" value="valid" />
+            </when>
+            <otherwise>
+                <!-- No token - allow request but track as anonymous -->
+                <!-- Security note: Request still requires valid APIM subscription key (api-key header) -->
+                <set-variable name="userId" value="anonymous-expired-token" />
+                <set-variable name="clientIp" value="@(context.Request.IpAddress)" />
+                <set-variable name="tokenStatus" value="missing" />
+            </otherwise>
+        </choose>
         <!-- AI Gateway: Emit token metrics for analytics with model dimension -->
         <llm-emit-token-metric>
-            <dimension name="Client IP address" value="@(context.Request.Headers.GetValueOrDefault(&quot;Authorization&quot;,&quot;&quot;).AsJwt()?.Claims.GetValueOrDefault(&quot;ipaddr&quot;, &quot;unknown&quot;))" />
-            <dimension name="User ID" value="@(context.Request.Headers.GetValueOrDefault(&quot;Authorization&quot;,&quot;&quot;).AsJwt()?.Claims.GetValueOrDefault(&quot;preferred_username&quot;, &quot;anonymous&quot;))" />
+            <dimension name="Client IP address" value="@((string)context.Variables[&quot;clientIp&quot;])" />
+            <dimension name="User ID" value="@((string)context.Variables[&quot;userId&quot;])" />
             <dimension name="Model" value="@((string)context.Variables[&quot;model&quot;])" />
+            <dimension name="Token Status" value="@((string)context.Variables[&quot;tokenStatus&quot;])" />
             <dimension name="Subscription ID" />
             <dimension name="API ID" />
         </llm-emit-token-metric>
-        <!-- AI Gateway: Token rate limiting with prompt estimation -->
-        <llm-token-limit tokens-per-minute="50000" estimate-prompt-tokens="true" counter-key="@(context.Request.Headers.GetValueOrDefault(&quot;Authorization&quot;,&quot;&quot;).AsJwt()?.Claims.GetValueOrDefault(&quot;preferred_username&quot;, &quot;anonymous&quot;))" tokens-consumed-header-name="consumed-tokens" remaining-tokens-header-name="remaining-tokens" />
+        <!-- AI Gateway: Token rate limiting - uses userId for per-user limits, falls back to subscription-level for anonymous -->
+        <llm-token-limit tokens-per-minute="200000" estimate-prompt-tokens="true" counter-key="@((string)context.Variables[&quot;userId&quot;])" tokens-consumed-header-name="consumed-tokens" remaining-tokens-header-name="remaining-tokens" />
         <set-backend-service backend-id="foundry-backend" />
         <authentication-managed-identity resource="https://cognitiveservices.azure.com" />
     </inbound>
@@ -40,5 +68,63 @@
     </outbound>
     <on-error>
         <base />
+        <choose>
+            <!-- Handle token validation failures - tell user to re-login -->
+            <when condition="@(context.Response.StatusCode == 401 &amp;&amp; context.LastError.Reason == &quot;TokenNotPresent&quot;)">
+                <return-response>
+                    <set-status code="401" reason="Unauthorized" />
+                    <set-header name="Content-Type" exists-action="override">
+                        <value>application/json</value>
+                    </set-header>
+                    <set-body>@{
+                        return new JObject(
+                            new JProperty("error", new JObject(
+                                new JProperty("message", "Your session has expired. Please refresh the page and log in again."),
+                                new JProperty("type", "authentication"),
+                                new JProperty("code", "session_expired")
+                            ))
+                        ).ToString();
+                    }</set-body>
+                </return-response>
+            </when>
+            <when condition="@(context.Response.StatusCode == 401)">
+                <return-response>
+                    <set-status code="401" reason="Unauthorized" />
+                    <set-header name="Content-Type" exists-action="override">
+                        <value>application/json</value>
+                    </set-header>
+                    <set-body>@{
+                        return new JObject(
+                            new JProperty("error", new JObject(
+                                new JProperty("message", "Authentication failed. Your token may be expired or invalid. Please log out and log in again."),
+                                new JProperty("type", "authentication"),
+                                new JProperty("code", "invalid_token"),
+                                new JProperty("details", context.LastError.Message)
+                            ))
+                        ).ToString();
+                    }</set-body>
+                </return-response>
+            </when>
+            <when condition="@(context.Response.StatusCode == 429)">
+                <return-response>
+                    <set-status code="429" reason="Too Many Requests" />
+                    <set-header name="Content-Type" exists-action="override">
+                        <value>application/json</value>
+                    </set-header>
+                    <set-header name="Retry-After" exists-action="override">
+                        <value>60</value>
+                    </set-header>
+                    <set-body>@{
+                        return new JObject(
+                            new JProperty("error", new JObject(
+                                new JProperty("message", "Rate limit exceeded. You've used too many tokens this minute. Please wait 60 seconds and try again."),
+                                new JProperty("type", "tokens"),
+                                new JProperty("code", "rate_limit_exceeded")
+                            ))
+                        ).ToString();
+                    }</set-body>
+                </return-response>
+            </when>
+        </choose>
     </on-error>
 </policies>

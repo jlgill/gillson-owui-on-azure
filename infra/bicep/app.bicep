@@ -194,7 +194,10 @@ resource resEntraIdApp 'Microsoft.Graph/applications@v1.0' = {
     ]
     implicitGrantSettings: {
       enableIdTokenIssuance: true
-      enableAccessTokenIssuance: true
+      // IMPORTANT: Must be false to get refresh tokens via authorization code flow
+      // When true, implicit flow is used which doesn't return refresh tokens
+      // Open WebUI uses auth code + PKCE (OAUTH_CODE_CHALLENGE_METHOD=S256)
+      enableAccessTokenIssuance: false
     }
   }
   // publicClient section intentionally empty - redirect URIs must be in web{} for confidential client flow
